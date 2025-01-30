@@ -90,102 +90,93 @@ def calculate_vwma(prices, volumes, period=20):
 
 # 🔹 Function to fetch stock data
 def get_stock_data(ticker):
-    max_retries = 3  # Retry up to 3 times if rate limited
-    retries = 0
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
 
-    while retries < max_retries:
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
+        if hist.empty:
+            print(f"⚠️ No historical data for {ticker}")
+            return None
 
-            if hist.empty:
-                print(f"⚠️ No historical data for {ticker}")
-                return None
+        # Extract Close prices and Volumes
+        prices = hist["Close"]
+        volumes = hist["Volume"]
 
-            # Extract Close prices and Volumes
-            prices = hist["Close"]
-            volumes = hist["Volume"]
+        # Market Cap and P/E Ratio
+        market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
+        pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
 
-            # Market Cap and P/E Ratio
-            market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
-            pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
+        # Current Price (latest available close price)
+        current_price = safe_convert(prices.iloc[-1])
 
-            # Current Price (latest available close price)
-            current_price = safe_convert(prices.iloc[-1])
+        # Yesterday's Close Price
+        yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
 
-            # Yesterday's Close Price
-            yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
+        # 1-Day Price Change
+        percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
 
-            # 1-Day Price Change
-            percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
+        # 1-Week and 1-Month Price Changes
+        one_week_ago_price = safe_convert(prices.iloc[-6]) if len(prices) > 6 else "N/A"
+        one_month_ago_price = safe_convert(prices.iloc[0])
+        percent_change_1wk = round(((current_price - one_week_ago_price) / one_week_ago_price) * 100, 2) if one_week_ago_price != "N/A" else "N/A"
+        percent_change_1mo = round(((current_price - one_month_ago_price) / one_month_ago_price) * 100, 2)
 
-            # 1-Week and 1-Month Price Changes
-            one_week_ago_price = safe_convert(prices.iloc[-6]) if len(prices) > 6 else "N/A"
-            one_month_ago_price = safe_convert(prices.iloc[0])
-            percent_change_1wk = round(((current_price - one_week_ago_price) / one_week_ago_price) * 100, 2) if one_week_ago_price != "N/A" else "N/A"
-            percent_change_1mo = round(((current_price - one_month_ago_price) / one_month_ago_price) * 100, 2)
+        # Volume
+        volume = safe_convert(volumes.iloc[-1])
 
-            # Volume
-            volume = safe_convert(volumes.iloc[-1])
+        # RSI (14-day)
+        rsi = calculate_rsi(prices, period=14)
 
-            # RSI (14-day)
-            rsi = calculate_rsi(prices, period=14)
+        # VWMA (20-day)
+        vwma = calculate_vwma(prices, volumes, period=20)
 
-            # VWMA (20-day)
-            vwma = calculate_vwma(prices, volumes, period=20)
+        # EMA (10-day)
+        ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
 
-            # EMA (10-day)
-            ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
+        # ATR (14-day)
+        atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
 
-            return [
-                market_cap, pe_ratio, current_price, yesterday_close_price,
-                format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
-                volume, rsi, vwma, ema
-            ]
+        return [
+            market_cap, pe_ratio, current_price, yesterday_close_price,
+            format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
+            volume, rsi, vwma, ema, atr
+        ]
 
-        except Exception as e:
-            if "Too Many Requests" in str(e) or "rate limited" in str(e):
-                print(f"⏳ Rate limit hit! Waiting 60 seconds before retrying {ticker}...")
-                time.sleep(60)  # ✅ Wait before retrying
-                retries += 1  # Increment retry counter
-            else:
-                print(f"❌ Error fetching data for {ticker}: {e}")
-                return None  # Skip stock if it's a different error
+    except Exception as e:
+        print(f"❌ Error fetching data for {ticker}: {e}")
+        return None
 
-    print(f"⚠️ Skipping {ticker} after {max_retries} failed attempts due to rate limit.")
-    switch_api_key()  # Switch API key if retries fail
-    return None
-
-# 🔹 Process tickers **in batches of 10** to reduce API calls
+# 🔹 Process each ticker row-by-row **with 60-second pause on rate limit errors**
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
-    batch_size = 10  # ✅ Process 10 stocks at a time
-    batch_data = []
-    row_numbers = []
 
     for idx, ticker in enumerate(tickers, start=2):  # Start from row 2
-        stock_data = get_stock_data(ticker)
-        if stock_data:
-            batch_data.append(stock_data)
-            row_numbers.append(idx)
+        while True:  # Retry mechanism for handling rate limits
+            try:
+                stock_data = get_stock_data(ticker)
+                if stock_data is None:
+                    print(f"⚠️ Skipping update for {ticker}: No data available.")
+                    break  # Skip this row
+                
+                # Convert to valid types for Google Sheets
+                stock_data = [safe_convert(val) for val in stock_data]
 
-        if len(batch_data) == batch_size or idx == len(tickers):
-            print(f"🔄 Updating rows: {row_numbers}")  # ✅ Print rows being updated
-            while True:
-                try:
-                    worksheet.update(f"C{row_numbers[0]}:L{row_numbers[-1]}", batch_data)
-                    print(f"✅ Batch updated {sheet_name} - Rows {row_numbers[0]} to {row_numbers[-1]}")
-                    batch_data.clear()
-                    row_numbers.clear()
-                    time.sleep(1)  # ✅ Add small delay to prevent quota errors
-                    break
-                except gspread.exceptions.APIError as e:
-                    if "429" in str(e):
-                        print(f"⚠️ Rate limit hit! Waiting 60 seconds before retrying...")
-                        time.sleep(60)
-                        switch_api_key()
-                    else:
-                        print(f"❌ Error updating {sheet_name}: {e}")
-                        break
+                # Update Google Sheet (Row-by-Row)
+                worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])  # ✅ Updates Columns C to N
+                print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
+
+                time.sleep(0.5)  # ✅ Avoid hitting rate limits
+                break  # Successfully updated, break retry loop
+
+            except gspread.exceptions.APIError as e:
+                if "429" in str(e):  # Detect API Rate Limit error
+                    print(f"⚠️ Rate limit hit! Pausing for 60 seconds before retrying {ticker}...")
+                    time.sleep(60)  # ✅ Pause for 60 seconds
+                    switch_api_key()  # ✅ Switch API Key
+                    sheet = client.open("Stock Investment Analysis")
+                    worksheet = sheet.worksheet(sheet_name)
+                else:
+                    print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
+                    break  # Move to next stock
 
 print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated with technical analysis!")
