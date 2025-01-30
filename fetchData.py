@@ -65,31 +65,7 @@ def safe_convert(value):
 def format_percentage(value):
     return f"{round(value, 2)}%" if value != "N/A" else "N/A"
 
-# 🔹 Function to calculate RSI
-def calculate_rsi(prices, period=14):
-    try:
-        delta = prices.diff()
-        gain = delta.where(delta > 0, 0).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        return safe_convert(rsi.iloc[-1]) if not rsi.isna().iloc[-1] else "N/A"
-    except Exception as e:
-        print(f"❌ Error calculating RSI: {e}")
-        return "N/A"
-
-# 🔹 Function to calculate VWMA
-def calculate_vwma(prices, volumes, period=20):
-    try:
-        if len(prices) < period:
-            return "N/A"
-        vwma = (prices * volumes).rolling(window=period).sum() / volumes.rolling(window=period).sum()
-        return safe_convert(vwma.iloc[-1])
-    except Exception as e:
-        print(f"❌ Error calculating VWMA: {e}")
-        return "N/A"
-
-# 🔹 Function to fetch stock data with improved error handling
+# 🔹 Function to fetch stock data
 def get_stock_data(ticker):
     max_retries = 3  # Retry up to 3 times if rate limited
     retries = 0
@@ -129,22 +105,10 @@ def get_stock_data(ticker):
             # Volume
             volume = safe_convert(volumes.iloc[-1])
 
-            # RSI (14-day)
-            rsi = calculate_rsi(prices, period=14)
-
-            # VWMA (20-day)
-            vwma = calculate_vwma(prices, volumes, period=20)
-
-            # EMA (10-day)
-            ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
-
-            # ATR (14-day)
-            atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
-
             return [
                 market_cap, pe_ratio, current_price, yesterday_close_price,
                 format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
-                volume, rsi, vwma, ema, atr
+                volume
             ]
 
         except Exception as e:
@@ -160,17 +124,36 @@ def get_stock_data(ticker):
     switch_api_key()  # Switch API key if retries fail
     return None
 
-# 🔹 Process each ticker for both Large Cap & Mid Cap sheets
+# 🔹 Process tickers **in batches of 10** to reduce API calls
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
+    batch_size = 10  # ✅ Process 10 stocks at a time
+    batch_data = []
+    row_numbers = []
 
     for idx, ticker in enumerate(tickers, start=2):  # Start from row 2
         stock_data = get_stock_data(ticker)
         if stock_data:
-            try:
-                worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])  # ✅ Updates Columns C to N
-                print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
-            except Exception as e:
-                print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
+            batch_data.append(stock_data)
+            row_numbers.append(idx)
+
+        # 🔹 **Batch update every 10 rows or at the end**
+        if len(batch_data) == batch_size or idx == len(tickers):
+            while True:  # ✅ Retry on rate limit error
+                try:
+                    worksheet.update(f"C{row_numbers[0]}:J{row_numbers[-1]}", batch_data)
+                    print(f"✅ Batch updated {sheet_name} - Rows {row_numbers[0]} to {row_numbers[-1]}")
+                    batch_data.clear()
+                    row_numbers.clear()
+                    time.sleep(1)  # ✅ Add small delay to prevent quota errors
+                    break  # Exit retry loop
+                except gspread.exceptions.APIError as e:
+                    if "429" in str(e):  # Detect API Rate Limit error
+                        print(f"⚠️ Rate limit hit! Waiting 60 seconds before retrying...")
+                        time.sleep(60)  # Wait 60 seconds
+                        switch_api_key()
+                    else:
+                        print(f"❌ Error updating {sheet_name}: {e}")
+                        break  # Move to next batch
 
 print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated with technical analysis!")
