@@ -165,7 +165,7 @@ for sheet_name, worksheet in sheets_to_update.items():
                 worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])  # ✅ Updates Columns C to N
                 print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
 
-                time.sleep(0.5)  # ✅ Avoid hitting rate limits
+                time.sleep(0.2)  # ✅ Avoid hitting rate limits
                 break  # Successfully updated, break retry loop
 
             except gspread.exceptions.APIError as e:
