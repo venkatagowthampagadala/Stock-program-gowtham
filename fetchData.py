@@ -8,18 +8,21 @@ import numpy as np
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# 🔹 JSON keys for API rotation
-CREDS_FILE_1 = r"C:\Users\venka\Downloads\stock-analysis-447717-f449ebc79388.json"
-CREDS_FILE_2 = r"C:\Users\venka\Downloads\stock-analysis-447717-6d99fc514040.json"
+# 🔹 Load credentials from GitHub Secrets
+CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
+CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
 
-# 🔹 Function to authenticate with Google Sheets using a JSON key
-def authenticate_with_json(json_key):
-    creds = ServiceAccountCredentials.from_json_keyfile_name(json_key, SCOPE)
+# 🔹 Function to authenticate with Google Sheets using JSON from environment variables
+def authenticate_with_json(json_str):
+    creds_dict = json.loads(json_str)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     return gspread.authorize(creds)
 
 # Start with API Key 1
-client = authenticate_with_json(CREDS_FILE_1)
+client = authenticate_with_json(CREDS_JSON_1)
 active_api = 1  # Track which API key is being used
+
+
 
 # Open the main spreadsheet and access both Large Cap & Mid Cap sheets
 sheet = client.open("Stock Investment Analysis")
@@ -28,11 +31,11 @@ sheets_to_update = {
     "Mid Cap": sheet.worksheet("Mid Cap")
 }
 
-# 🔹 Function to switch API keys
+# 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
     active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_FILE_2 if active_api == 2 else CREDS_FILE_1)
+    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
 
 # 🔹 Function to fetch tickers from a Google Sheet
