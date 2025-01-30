@@ -1,41 +1,29 @@
-name: Run Stock Scripts
+name: Run Fetch Data Script
 
 on:
-  schedule:
-    - cron: '0 6-20 * * *'  # Runs every hour from 6 AM to 8 PM UTC
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:  # Allows manual trigger
+  push:
+    branches:
+      - main  # Runs automatically when code is pushed to main
 
 jobs:
-  run-scripts:
+  run-script:
     runs-on: ubuntu-latest
-    
-    env:
-      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/google-creds.json
-      GOOGLE_APPLICATION_CREDENTIALS_ALT: ${{ github.workspace }}/google-creds-alt.json
-
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  # Fetches latest code from GitHub
 
-      - name: Set Up Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # Use the required Python version
+          python-version: 3.9  # Adjust if needed
 
       - name: Install Dependencies
         run: |
           pip install -r requirements.txt
 
-      - name: Setup Google Credentials (Primary)
-        run: |
-          echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" > $GOOGLE_APPLICATION_CREDENTIALS
-          echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" > $GOOGLE_APPLICATION_CREDENTIALS_ALT
-
       - name: Run fetchData.py
-        run: python fetchData.py || echo "fetchData.py failed, switching API key" && export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS_ALT && python fetchData.py
-
-      - name: Run scoreUpdate.py
-        run: python scoreUpdate.py || echo "scoreUpdate.py failed, switching API key" && export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS_ALT && python scoreUpdate.py
-
-      - name: Run updateHybrid.py
-        run: python updateHybrid.py || echo "updateHybrid.py failed, switching API key" && export GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS_ALT && python updateHybrid.py
+        env:
+          GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
+          GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
+        run: python fetchData.py
