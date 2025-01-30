@@ -1,9 +1,11 @@
+import os  # Add this line at the top
 import yfinance as yf
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
 import pandas as pd
 import numpy as np
+
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
