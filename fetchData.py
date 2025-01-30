@@ -171,7 +171,7 @@ for sheet_name, worksheet in sheets_to_update.items():
             except gspread.exceptions.APIError as e:
                 if "429" in str(e):  # Detect API Rate Limit error
                     print(f"⚠️ Rate limit hit! Pausing for 60 seconds before retrying {ticker}...")
-                    time.sleep(60)  # ✅ Pause for 60 seconds
+                    time.sleep(10)  # ✅ Pause for 60 seconds
                     switch_api_key()  # ✅ Switch API Key
                     sheet = client.open("Stock Investment Analysis")
                     worksheet = sheet.worksheet(sheet_name)
