@@ -89,7 +89,7 @@ def calculate_vwma(prices, volumes, period=20):
         print(f"❌ Error calculating VWMA: {e}")
         return "N/A"
 
-# 🔹 Function to fetch stock data with proper rate-limit handling
+# 🔹 Function to fetch stock data with improved error handling
 def get_stock_data(ticker):
     max_retries = 3  # Retry up to 3 times if rate limited
     retries = 0
@@ -167,7 +167,10 @@ for sheet_name, worksheet in sheets_to_update.items():
     for idx, ticker in enumerate(tickers, start=2):  # Start from row 2
         stock_data = get_stock_data(ticker)
         if stock_data:
-            worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])  # ✅ Updates Columns C to N
-            print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
+            try:
+                worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])  # ✅ Updates Columns C to N
+                print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
+            except Exception as e:
+                print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
 
 print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated with technical analysis!")
