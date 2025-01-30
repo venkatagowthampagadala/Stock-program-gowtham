@@ -1,4 +1,5 @@
-import os  # Add this line at the top
+import os  # Required for environment variables
+import json  # Required for JSON parsing
 import yfinance as yf
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
