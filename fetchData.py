@@ -7,7 +7,6 @@ import time
 import pandas as pd
 import numpy as np
 
-
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
@@ -65,6 +64,30 @@ def safe_convert(value):
 def format_percentage(value):
     return f"{round(value, 2)}%" if value != "N/A" else "N/A"
 
+# 🔹 Function to calculate RSI
+def calculate_rsi(prices, period=14):
+    try:
+        delta = prices.diff()
+        gain = delta.where(delta > 0, 0).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return safe_convert(rsi.iloc[-1]) if not rsi.isna().iloc[-1] else "N/A"
+    except Exception as e:
+        print(f"❌ Error calculating RSI: {e}")
+        return "N/A"
+
+# 🔹 Function to calculate VWMA
+def calculate_vwma(prices, volumes, period=20):
+    try:
+        if len(prices) < period:
+            return "N/A"
+        vwma = (prices * volumes).rolling(window=period).sum() / volumes.rolling(window=period).sum()
+        return safe_convert(vwma.iloc[-1])
+    except Exception as e:
+        print(f"❌ Error calculating VWMA: {e}")
+        return "N/A"
+
 # 🔹 Function to fetch stock data
 def get_stock_data(ticker):
     max_retries = 3  # Retry up to 3 times if rate limited
@@ -105,10 +128,19 @@ def get_stock_data(ticker):
             # Volume
             volume = safe_convert(volumes.iloc[-1])
 
+            # RSI (14-day)
+            rsi = calculate_rsi(prices, period=14)
+
+            # VWMA (20-day)
+            vwma = calculate_vwma(prices, volumes, period=20)
+
+            # EMA (10-day)
+            ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
+
             return [
                 market_cap, pe_ratio, current_price, yesterday_close_price,
                 format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
-                volume
+                volume, rsi, vwma, ema
             ]
 
         except Exception as e:
@@ -137,23 +169,23 @@ for sheet_name, worksheet in sheets_to_update.items():
             batch_data.append(stock_data)
             row_numbers.append(idx)
 
-        # 🔹 **Batch update every 10 rows or at the end**
         if len(batch_data) == batch_size or idx == len(tickers):
-            while True:  # ✅ Retry on rate limit error
+            print(f"🔄 Updating rows: {row_numbers}")  # ✅ Print rows being updated
+            while True:
                 try:
-                    worksheet.update(f"C{row_numbers[0]}:J{row_numbers[-1]}", batch_data)
+                    worksheet.update(f"C{row_numbers[0]}:L{row_numbers[-1]}", batch_data)
                     print(f"✅ Batch updated {sheet_name} - Rows {row_numbers[0]} to {row_numbers[-1]}")
                     batch_data.clear()
                     row_numbers.clear()
                     time.sleep(1)  # ✅ Add small delay to prevent quota errors
-                    break  # Exit retry loop
+                    break
                 except gspread.exceptions.APIError as e:
-                    if "429" in str(e):  # Detect API Rate Limit error
+                    if "429" in str(e):
                         print(f"⚠️ Rate limit hit! Waiting 60 seconds before retrying...")
-                        time.sleep(60)  # Wait 60 seconds
+                        time.sleep(60)
                         switch_api_key()
                     else:
                         print(f"❌ Error updating {sheet_name}: {e}")
-                        break  # Move to next batch
+                        break
 
 print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated with technical analysis!")
