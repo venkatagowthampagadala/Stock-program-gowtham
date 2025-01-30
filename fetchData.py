@@ -25,8 +25,6 @@ def authenticate_with_json(json_str):
 client = authenticate_with_json(CREDS_JSON_1)
 active_api = 1  # Track which API key is being used
 
-
-
 # Open the main spreadsheet and access both Large Cap & Mid Cap sheets
 sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
@@ -91,94 +89,85 @@ def calculate_vwma(prices, volumes, period=20):
         print(f"❌ Error calculating VWMA: {e}")
         return "N/A"
 
-# 🔹 Function to fetch stock data
+# 🔹 Function to fetch stock data with proper rate-limit handling
 def get_stock_data(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
+    max_retries = 3  # Retry up to 3 times if rate limited
+    retries = 0
 
-        if hist.empty:
-            print(f"⚠️ No historical data for {ticker}")
-            return None
+    while retries < max_retries:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
 
-        # Extract Close prices and Volumes
-        prices = hist["Close"]
-        volumes = hist["Volume"]
+            if hist.empty:
+                print(f"⚠️ No historical data for {ticker}")
+                return None
 
-        # Market Cap and P/E Ratio
-        market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
-        pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
+            # Extract Close prices and Volumes
+            prices = hist["Close"]
+            volumes = hist["Volume"]
 
-        # Current Price (latest available close price)
-        current_price = safe_convert(prices.iloc[-1])
+            # Market Cap and P/E Ratio
+            market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
+            pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
 
-        # Yesterday's Close Price
-        yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
+            # Current Price (latest available close price)
+            current_price = safe_convert(prices.iloc[-1])
 
-        # 1-Day Price Change
-        percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
+            # Yesterday's Close Price
+            yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
 
-        # 1-Week and 1-Month Price Changes
-        one_week_ago_price = safe_convert(prices.iloc[-6]) if len(prices) > 6 else "N/A"
-        one_month_ago_price = safe_convert(prices.iloc[0])
-        percent_change_1wk = round(((current_price - one_week_ago_price) / one_week_ago_price) * 100, 2) if one_week_ago_price != "N/A" else "N/A"
-        percent_change_1mo = round(((current_price - one_month_ago_price) / one_month_ago_price) * 100, 2)
+            # 1-Day Price Change
+            percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
 
-        # Volume
-        volume = safe_convert(volumes.iloc[-1])
+            # 1-Week and 1-Month Price Changes
+            one_week_ago_price = safe_convert(prices.iloc[-6]) if len(prices) > 6 else "N/A"
+            one_month_ago_price = safe_convert(prices.iloc[0])
+            percent_change_1wk = round(((current_price - one_week_ago_price) / one_week_ago_price) * 100, 2) if one_week_ago_price != "N/A" else "N/A"
+            percent_change_1mo = round(((current_price - one_month_ago_price) / one_month_ago_price) * 100, 2)
 
-        # RSI (14-day)
-        rsi = calculate_rsi(prices, period=14)
+            # Volume
+            volume = safe_convert(volumes.iloc[-1])
 
-        # VWMA (20-day)
-        vwma = calculate_vwma(prices, volumes, period=20)
+            # RSI (14-day)
+            rsi = calculate_rsi(prices, period=14)
 
-        # EMA (10-day)
-        ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
+            # VWMA (20-day)
+            vwma = calculate_vwma(prices, volumes, period=20)
 
-        # ATR (14-day)
-        atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
+            # EMA (10-day)
+            ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
 
-        return [
-            market_cap, pe_ratio, current_price, yesterday_close_price,
-            format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
-            volume, rsi, vwma, ema, atr
-        ]
+            # ATR (14-day)
+            atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
 
-    except Exception as e:
-        print(f"❌ Error fetching data for {ticker}: {e}")
-        return None
+            return [
+                market_cap, pe_ratio, current_price, yesterday_close_price,
+                format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
+                volume, rsi, vwma, ema, atr
+            ]
+
+        except Exception as e:
+            if "Too Many Requests" in str(e) or "rate limited" in str(e):
+                print(f"⏳ Rate limit hit! Waiting 60 seconds before retrying {ticker}...")
+                time.sleep(60)  # ✅ Wait before retrying
+                retries += 1  # Increment retry counter
+            else:
+                print(f"❌ Error fetching data for {ticker}: {e}")
+                return None  # Skip stock if it's a different error
+
+    print(f"⚠️ Skipping {ticker} after {max_retries} failed attempts due to rate limit.")
+    switch_api_key()  # Switch API key if retries fail
+    return None
 
 # 🔹 Process each ticker for both Large Cap & Mid Cap sheets
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
 
     for idx, ticker in enumerate(tickers, start=2):  # Start from row 2
-        while True:  # Retry mechanism for handling rate limits
-            try:
-                stock_data = get_stock_data(ticker)
-                if stock_data is None:
-                    print(f"⚠️ Skipping update for {ticker}: No data available.")
-                    break  # Skip this row
-                
-                # Convert to valid types for Google Sheets
-                stock_data = [safe_convert(val) for val in stock_data]
-
-                # Update Google Sheet
-                worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])  # ✅ Updates Columns C to N
-                print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
-
-                  # ✅ Avoid hitting rate limits
-                break  # Successfully updated, break retry loop
-
-            except gspread.exceptions.APIError as e:
-                if "429" in str(e):  # Detect API Rate Limit error
-                    print(f"⚠️ Rate limit hit! Switching API keys...")
-                    switch_api_key()
-                    sheet = client.open("Stock Investment Analysis")
-                    worksheet = sheet.worksheet(sheet_name)
-                else:
-                    print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
-                    break  # Move to next stock
+        stock_data = get_stock_data(ticker)
+        if stock_data:
+            worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])  # ✅ Updates Columns C to N
+            print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
 
 print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated with technical analysis!")
