@@ -1,3 +1,5 @@
+import os  # Required for environment variables
+import json  # Required for JSON parsing
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
@@ -6,17 +8,18 @@ import time
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# 🔹 JSON keys for API rotation
-CREDS_FILE_1 = r"C:\Users\venka\Downloads\stock-analysis-447717-f449ebc79388.json"
-CREDS_FILE_2 = r"C:\Users\venka\Downloads\stock-analysis-447717-6d99fc514040.json"
+# 🔹 Load credentials from GitHub Secrets
+CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
+CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
 
-# 🔹 Function to authenticate with Google Sheets using a JSON key
-def authenticate_with_json(json_key):
-    creds = ServiceAccountCredentials.from_json_keyfile_name(json_key, SCOPE)
+# 🔹 Function to authenticate with Google Sheets using JSON from environment variables
+def authenticate_with_json(json_str):
+    creds_dict = json.loads(json_str)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     return gspread.authorize(creds)
 
 # Start with API Key 1
-client = authenticate_with_json(CREDS_FILE_1)
+client = authenticate_with_json(CREDS_JSON_1)
 active_api = 1  # Track which API key is being used
 
 # Open the main spreadsheet and access sheets
@@ -24,13 +27,13 @@ sheet = client.open("Stock Investment Analysis")
 large_cap_ws = sheet.worksheet("Large Cap")
 mid_cap_ws = sheet.worksheet("Mid Cap")
 hybrid_ws = sheet.worksheet("Hybrid")
-super_green_ws = sheet.worksheet("Super Green")  # ✅ New Super Green Sheet
+super_green_ws = sheet.worksheet("Super Green")  # ✅ Super Green Sheet
 
-# 🔹 Function to switch API keys
+# 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
     active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_FILE_2 if active_api == 2 else CREDS_FILE_1)
+    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
 
 # Fetch data from Large Cap & Mid Cap sheets
@@ -86,7 +89,7 @@ for idx, row in df_large.iterrows():
         super_green_stocks.append(stock_data)
         print(f"🚀 Super Green Stock Identified: {stock_data['Symbol']}")
 
-    time.sleep(0.2)  # ✅ Wait per row
+    time.sleep(0.2)  # ✅ Avoid rate limits
 
 # Process Mid Cap Stocks
 for idx, row in df_mid.iterrows():
@@ -112,7 +115,7 @@ for idx, row in df_mid.iterrows():
         super_green_stocks.append(stock_data)
         print(f"🚀 Super Green Stock Identified: {stock_data['Symbol']}")
 
-    time.sleep(0.2)  # ✅ Wait per row
+    time.sleep(0.2)  # ✅ Avoid rate limits
 
 # 🔹 Merge the two lists for Hybrid stocks
 hybrid_stocks = eligible_large_cap + eligible_mid_cap
@@ -138,7 +141,8 @@ if not df_hybrid.empty:
             retry = False  
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
-                print(f"⚠️ Rate limit hit! Switching API keys...")
+                print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
+                time.sleep(60)  # ✅ Wait before retrying
                 switch_api_key()
                 sheet = client.open("Stock Investment Analysis")
                 hybrid_ws = sheet.worksheet("Hybrid")
@@ -162,7 +166,8 @@ if not df_super_green.empty:
             retry = False  
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
-                print(f"⚠️ Rate limit hit! Switching API keys...")
+                print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
+                time.sleep(10)  # ✅ Wait before retrying
                 switch_api_key()
                 sheet = client.open("Stock Investment Analysis")
                 super_green_ws = sheet.worksheet("Super Green")
