@@ -17,6 +17,7 @@ CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
 
 # 🔹 OpenAI API Key
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY  # ✅ Set OpenAI Key
 
 # Ensure json module is imported
 def authenticate_with_json(json_str):
@@ -119,9 +120,11 @@ def analyze_stock(ticker):
         - Recent Performance
         """
 
+        # ✅ Updated for OpenAI API v1+ (Fixes the error)
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "system", "content": "You are a financial analyst."},
+                      {"role": "user", "content": prompt}]
         )
 
         ai_analysis = response["choices"][0]["message"]["content"]
