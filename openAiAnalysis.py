@@ -1,24 +1,22 @@
-import os
-import openai
-import requests
-import yfinance as yf
+import os  # Required for environment variables
+import json  # Required for JSON parsing
 import gspread
-import pandas as pd
-import time
-from bs4 import BeautifulSoup
 from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+import openai
+import time
 
-# 📌 Set OpenAI API Key (Replace this with your API key)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# 📌 Google Sheets API Setup
+# 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# 🔹 Load credentials from GitHub Secrets or local file
+# 🔹 Load credentials from GitHub Secrets
 CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
 CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
 
-# 🔹 Function to authenticate with Google Sheets
+# 🔹 OpenAI API Key
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Ensure json module is imported
 def authenticate_with_json(json_str):
     creds_dict = json.loads(json_str)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
@@ -27,6 +25,8 @@ def authenticate_with_json(json_str):
 # Start with API Key 1
 client = authenticate_with_json(CREDS_JSON_1)
 active_api = 1  # Track which API key is being used
+
+print("✅ Successfully authenticated with Google Sheets and OpenAI!")
 
 # Open the spreadsheet and access Top Picks sheet
 sheet = client.open("Stock Investment Analysis")
