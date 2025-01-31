@@ -58,8 +58,8 @@ def clean_float(value):
 for col in numeric_cols:
     df_super_green[col] = df_super_green[col].apply(clean_float)
 
-# Convert "Latest News Date" to datetime format
-df_super_green["Latest News Date"] = pd.to_datetime(df_super_green["Latest News Date"], errors='coerce')
+# Convert "Latest News Date" to datetime format and specify day-first format
+df_super_green["Latest News Date"] = pd.to_datetime(df_super_green["Latest News Date"], format="%d-%m-%Y %H:%M:%S", errors='coerce')
 
 # Calculate News Age (Days)
 today = datetime.today()
@@ -109,6 +109,10 @@ column_order = [
 # Ensure only existing columns are included
 df_top_picks = df_top_picks[[col for col in column_order if col in df_top_picks.columns]]
 
+# Convert Pandas Timestamps to String before updating Google Sheets
+df_top_picks["Latest News Date"] = df_top_picks["Latest News Date"].dt.strftime("%Y-%m-%d %H:%M:%S").fillna("N/A")
+df_top_picks["News Update Date"] = df_top_picks["News Update Date"].astype(str)
+
 # Convert DataFrame to list of lists (for Google Sheets update)
 top_picks_data = [df_top_picks.columns.tolist()] + df_top_picks.values.tolist()
 
@@ -117,7 +121,7 @@ retry = True
 while retry:
     try:
         top_picks_ws.clear()
-        top_picks_ws.update("A1", top_picks_data)
+        top_picks_ws.update(values=top_picks_data, range_name="A1")  # ✅ Fixed argument order
         print(f"✅ Top Picks Identified & Updated in 'Top Picks' Sheet - {len(df_top_picks)} stocks")
         retry = False  # Successfully updated, exit retry loop
     except gspread.exceptions.APIError as e:
