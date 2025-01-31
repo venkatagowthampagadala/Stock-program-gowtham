@@ -1,14 +1,13 @@
-- name: Set Up Google Credentials
-  run: |
-    echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" > creds1.json
-    echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" > creds2.json
-name: Stock Analysis Automation
+
+ name: Stock Analysis Automation
 
 on:
   schedule:
     - cron: '0 * * * 1-5'  # Runs on top of the hour (Monday-Friday)
   workflow_dispatch:  # ✅ Enables manual trigger
-
+run: |
+  echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" > creds1.json
+  echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" > creds2.json
 jobs:
   run_stock_analysis:
     runs-on: ubuntu-latest
