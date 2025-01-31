@@ -120,14 +120,16 @@ def analyze_stock(ticker):
         - Recent Performance
         """
 
-        # ✅ Updated for OpenAI API v1+ (Fixes the error)
+        # ✅ FIX: Updated for OpenAI API v1+
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "system", "content": "You are a financial analyst."},
-                      {"role": "user", "content": prompt}]
+            messages=[
+                {"role": "system", "content": "You are a professional stock analyst."},
+                {"role": "user", "content": prompt}
+            ]
         )
 
-        ai_analysis = response["choices"][0]["message"]["content"]
+        ai_analysis = response.choices[0].message["content"]  # ✅ Extract correct response
         print(f"✅ AI Analysis for {ticker}: {ai_analysis[:100]}...")  # Print first 100 chars for preview
 
         return [
