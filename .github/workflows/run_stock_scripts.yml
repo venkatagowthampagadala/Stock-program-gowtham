@@ -1,29 +1,44 @@
-name: Run Fetch Data Script
+name: Stock Market Analysis Workflow
 
 on:
-  workflow_dispatch:  # Allows manual trigger
-  push:
-    branches:
-      - main  # Runs automatically when code is pushed to main
+  schedule:
+    # Runs every hour on the hour from 6 AM to 8 PM (Monday to Friday)
+    - cron: "0,40, 6-20 * * 1-5"
+
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
-  run-script:
+  run-scripts:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3  # Fetches latest code from GitHub
+        uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set Up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9  # Adjust if needed
+          python-version: '3.9'
 
       - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
-      - name: Run fetchData.py
+      - name: Set Up Google Credentials
+        run: |
+          echo "$GOOGLE_CREDENTIALS_1" > creds1.json
+          echo "$GOOGLE_CREDENTIALS_2" > creds2.json
         env:
           GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
           GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
+
+      - name: Run Fetch Data
+        run: python fetchData.py
+
+      - name: Run Score Update
+        run: python scoreUpdate.py
+
+      - name: Run Hybrid Update
+        run: python updateHybrid.py
+
+      - name: Run Top Picks Update
         run: python updateTop.py
