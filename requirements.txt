@@ -3,3 +3,6 @@ oauth2client
 pandas
 numpy
 yfinance
+openai
+beautifulsoup4
+requests
