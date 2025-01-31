@@ -2,5 +2,37 @@
   run: |
     echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" > creds1.json
     echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" > creds2.json
+name: Stock Analysis Automation
+
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * 1-5'  # Runs on top of the hour (Monday-Friday)
+  workflow_dispatch:  # ✅ Enables manual trigger
+
+jobs:
+  run_stock_analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run FetchData Script
+        run: python fetchData.py
+
+      - name: Run ScoreUpdate Script
+        run: python scoreUpdate.py
+
+      - name: Run UpdateHybrid Script
+        run: python updateHybrid.py
+
+      - name: Run UpdateTop Script
+        run: python updateTop.py
+
