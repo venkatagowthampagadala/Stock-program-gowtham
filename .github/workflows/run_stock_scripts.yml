@@ -1,56 +1,29 @@
-name: Stock Analysis Automation
+name: Run Fetch Data Script
 
 on:
-  schedule:
-    - cron: "0 6 * * 1-5"
-    - cron: "0 7 * * 1-5"
-    - cron: "0 8 * * 1-5"
-    - cron: "0 9 * * 1-5"
-    - cron: "0 10 * * 1-5"
-    - cron: "0 11 * * 1-5"
-    - cron: "0 12 * * 1-5"
-    - cron: "0 13 * * 1-5"
-    - cron: "0 14 * * 1-5"
-    - cron: "0 15 * * 1-5"
-    - cron: "0 16 * * 1-5"
-    - cron: "0 17 * * 1-5"
-    - cron: "0 18 * * 1-5"
-    - cron: "0 19 * * 1-5"
-    - cron: "0 20 * * 1-5"
   workflow_dispatch:  # Allows manual trigger
+  push:
+    branches:
+      - main  # Runs automatically when code is pushed to main
 
 jobs:
-  run_stock_analysis:
+  run-script:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3  # Fetches latest code from GitHub
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: 3.9  # Adjust if needed
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Set Up Google Credentials
+      - name: Install Dependencies
         run: |
-          echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" > creds1.json
-          echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" > creds2.json
-          sed -i 's/\\n/\n/g' creds1.json
-          sed -i 's/\\n/\n/g' creds2.json
+          pip install -r requirements.txt
 
-
-      - name: Run FetchData Script
+      - name: Run fetchData.py
+        env:
+          GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
+          GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
         run: python fetchData.py
-
-      - name: Run ScoreUpdate Script
-        run: python scoreUpdate.py
-
-      - name: Run UpdateHybrid Script
-        run: python updateHybrid.py
-
-      - name: Run UpdateTop Script
-        run: python updateTop.py
