@@ -2,21 +2,22 @@ name: Stock Analysis Automation
 
 on:
   schedule:
-    - cron: '0 * * * 1-5'  # Runs on top of the hour (Monday-Friday)
-  workflow_dispatch:  # ✅ Enables manual trigger
+    - cron: "0 6-20 * * 1-5"  # Runs every hour from 6 AM to 8 PM (Monday-Friday)
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
   run_stock_analysis:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
-      
+          python-version: "3.9"
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -31,4 +32,3 @@ jobs:
 
       - name: Run UpdateTop Script
         run: python updateTop.py
-
