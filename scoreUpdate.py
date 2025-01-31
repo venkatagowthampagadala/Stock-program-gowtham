@@ -161,7 +161,7 @@ for sheet_name, worksheet in sheets_to_update.items():
                 error_message = str(e)
                 if "429" in error_message:
                     print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
-                    time.sleep(60)  # Wait for 60 seconds
+                    time.sleep(10)  # Wait for 60 seconds
                     switch_api_key()  # Switch API Key
                     worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
                 else:
