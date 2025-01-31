@@ -1,32 +1,38 @@
+import os  # Required for environment variables
+import json  # Required for JSON parsing
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import time
+from datetime import datetime, timedelta
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-CREDS_FILE_1 = r"C:\Users\venka\Downloads\stock-analysis-447717-f449ebc79388.json"
-CREDS_FILE_2 = r"C:\Users\venka\Downloads\stock-analysis-447717-6d99fc514040.json"
 
-# 🔹 Function to authenticate with Google Sheets using a JSON key
-def authenticate_with_json(json_key):
-    creds = ServiceAccountCredentials.from_json_keyfile_name(json_key, SCOPE)
+# 🔹 Load credentials from GitHub Secrets
+CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
+CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
+
+# 🔹 Function to authenticate with Google Sheets using JSON from environment variables
+def authenticate_with_json(json_str):
+    creds_dict = json.loads(json_str)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     return gspread.authorize(creds)
 
 # Start with API Key 1
-client = authenticate_with_json(CREDS_FILE_1)
+client = authenticate_with_json(CREDS_JSON_1)
 active_api = 1  # Track which API key is being used
 
 # Open the main spreadsheet and access sheets
 sheet = client.open("Stock Investment Analysis")
 super_green_ws = sheet.worksheet("Super Green")
-top30_ws = sheet.worksheet("Top 30")
+top_picks_ws = sheet.worksheet("Top Picks")  # ✅ Updated to "Top Picks"
 
 # 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
     active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_FILE_2 if active_api == 2 else CREDS_FILE_1)
+    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
 
 # Fetch data from Super Green sheet
@@ -52,8 +58,22 @@ def clean_float(value):
 for col in numeric_cols:
     df_super_green[col] = df_super_green[col].apply(clean_float)
 
-# 🔹 Rank stocks based on key performance indicators
-df_super_green = df_super_green.sort_values(by="Score", ascending=False)
+# Convert "Latest News Date" to datetime format
+df_super_green["Latest News Date"] = pd.to_datetime(df_super_green["Latest News Date"], errors='coerce')
+
+# Calculate News Age (Days)
+today = datetime.today()
+df_super_green["News Age"] = (today - df_super_green["Latest News Date"]).dt.days.fillna(999)
+
+# **Modify Score Based on News Age:**
+# - Stocks with recent news (≤90 days) maintain their score.
+# - Stocks with news older than 90 days get their score reduced by 20%.
+df_super_green["Adjusted Score"] = df_super_green.apply(
+    lambda row: row["Score"] * 0.8 if row["News Age"] > 90 else row["Score"], axis=1
+)
+
+# 🔹 Rank stocks based on adjusted score
+df_super_green = df_super_green.sort_values(by="Adjusted Score", ascending=False)
 df_super_green["Rank"] = range(1, len(df_super_green) + 1)
 
 # 🔹 Calculate Stop Price, Buy Price, Sell Price
@@ -74,8 +94,8 @@ def calculate_prices(row):
 
 df_super_green[["Stop Price", "Buy Price", "Sell Price"]] = df_super_green.apply(calculate_prices, axis=1)
 
-# 🔹 Select Top 30 stocks for Top 30 sheet with all columns
-df_top30 = df_super_green.head(30)
+# **All high-potential stocks included (not limited to 30)**
+df_top_picks = df_super_green.copy()
 
 # Reorder columns to match the required format
 column_order = [
@@ -83,29 +103,30 @@ column_order = [
     "P/E", "Yesterday Close Price", "1 Day Price Change", "1 Week Price Change", "1 Month Price Change",
     "Volume", "RSI", "VWMA", "EMA", "ATR", "Industry", "Positive Rating", "Negative Rating",
     "Sentiment Ratio", "Latest News Date", "News 1", "News 2", "News 3", "News 4", "News 5",
-    "News Link 1", "News Link 2", "News Link 3", "News Link 4", "News Link 5", "News Update Date", "Score", "VWMA vs Current Price"
+    "News Link 1", "News Link 2", "News Link 3", "News Link 4", "News Link 5", "News Update Date", "Adjusted Score", "VWMA vs Current Price"
 ]
 
 # Ensure only existing columns are included
-df_top30 = df_top30[[col for col in column_order if col in df_top30.columns]]
+df_top_picks = df_top_picks[[col for col in column_order if col in df_top_picks.columns]]
 
 # Convert DataFrame to list of lists (for Google Sheets update)
-top30_data = [df_top30.columns.tolist()] + df_top30.values.tolist()
+top_picks_data = [df_top_picks.columns.tolist()] + df_top_picks.values.tolist()
 
-# Clear and update the Top 30 sheet
+# Clear and update the "Top Picks" sheet
 retry = True
 while retry:
     try:
-        top30_ws.clear()
-        top30_ws.update("A1", top30_data)
-        print(f"✅ Top 30 Stocks Identified & Updated in 'Top 30' Sheet - {len(df_top30)} stocks")
+        top_picks_ws.clear()
+        top_picks_ws.update("A1", top_picks_data)
+        print(f"✅ Top Picks Identified & Updated in 'Top Picks' Sheet - {len(df_top_picks)} stocks")
         retry = False  # Successfully updated, exit retry loop
     except gspread.exceptions.APIError as e:
         if "429" in str(e):  # Detect API Rate Limit error
-            print(f"⚠️ Rate limit hit! Switching API keys...")
+            print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
+            time.sleep(60)  # ✅ Wait before retrying
             switch_api_key()
             sheet = client.open("Stock Investment Analysis")
-            top30_ws = sheet.worksheet("Top 30")  # Re-authenticate the Top 30 Sheet
+            top_picks_ws = sheet.worksheet("Top Picks")  # Re-authenticate the sheet
         else:
-            print(f"❌ Error updating Top 30 Sheet: {e}")
+            print(f"❌ Error updating Top Picks Sheet: {e}")
             retry = False  # Stop retrying if it's a different error
