@@ -5,6 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import openai
 import time
+import yfinance as yf  # ✅ Fix: Import yfinance
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
