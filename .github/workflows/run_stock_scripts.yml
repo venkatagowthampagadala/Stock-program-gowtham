@@ -1,11 +1,70 @@
-- name: Set Up Google Credentials
-  run: |
-    echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" > creds1.json
-    echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" > creds2.json
-  on:
+name: Stock Analysis Automation
+
+on:
   schedule:
-    - cron: "*/5 6-20 * * 1-5"  # Runs every hour from 6 AM to 8 PM (Monday-Friday)
+    - cron: "0 * 6-20 * * 1-5"  # Runs every hour on the top of the hour (6 AM - 8 PM, Monday-Friday)
   workflow_dispatch:  # Allows manual trigger
 
+jobs:
+  run_stock_analysis:
+    runs-on: ubuntu-latest
 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Debug Secrets Retrieval
+        run: |
+          if [ -z "${{ secrets.GOOGLE_CREDENTIALS_1 }}" ]; then
+            echo "❌ GOOGLE_CREDENTIALS_1 is empty!"
+            exit 1
+          else
+            echo "✅ GOOGLE_CREDENTIALS_1 retrieved! Length: $(echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" | wc -c)"
+          fi
+
+          if [ -z "${{ secrets.GOOGLE_CREDENTIALS_2 }}" ]; then
+            echo "❌ GOOGLE_CREDENTIALS_2 is empty!"
+            exit 1
+          else
+            echo "✅ GOOGLE_CREDENTIALS_2 retrieved! Length: $(echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" | wc -c)"
+          fi
+
+      - name: Set Up Google Credentials
+        run: |
+          echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" | jq . > creds1.json
+          echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" | jq . > creds2.json
+          
+          # Check if the JSON files were created
+          if [ -s creds1.json ]; then
+            echo "✅ creds1.json created successfully!"
+          else
+            echo "❌ creds1.json is empty!"
+            exit 1
+          fi
+
+          if [ -s creds2.json ]; then
+            echo "✅ creds2.json created successfully!"
+          else
+            echo "❌ creds2.json is empty!"
+            exit 1
+          fi
+
+      - name: Run FetchData Script
+        run: python fetchData.py
+
+      - name: Run ScoreUpdate Script
+        run: python scoreUpdate.py
+
+      - name: Run UpdateHybrid Script
+        run: python updateHybrid.py
+
+      - name: Run UpdateTop Script
+        run: python updateTop.py
