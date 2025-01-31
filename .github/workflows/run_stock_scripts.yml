@@ -2,7 +2,7 @@ name: Stock Analysis Automation
 
 on:
   schedule:
-    - cron: "0 6-20 * * 1-5"  # Runs every hour from 6 AM to 8 PM (Monday-Friday)
+    - cron: "*/5 6-20 * * 1-5"  # Runs every hour from 6 AM to 8 PM (Monday-Friday)
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
