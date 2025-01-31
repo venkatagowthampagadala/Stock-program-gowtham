@@ -2,3 +2,5 @@
   run: |
     echo "${{ secrets.GOOGLE_CREDENTIALS_1 }}" > creds1.json
     echo "${{ secrets.GOOGLE_CREDENTIALS_2 }}" > creds2.json
+on:
+  workflow_dispatch:
