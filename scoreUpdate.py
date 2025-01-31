@@ -1,3 +1,5 @@
+import os  # Required for environment variables
+import json  # Required for JSON parsing
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
@@ -7,19 +9,19 @@ from datetime import datetime, timedelta
 # 🔹 Google Sheets API Setup with Two Keys
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-KEYS = [
-    r"C:\Users\venka\Downloads\Stock Python",
-    r"C:\Users\venka\Downloads\Stock Python"
-]
+# 🔹 Load credentials from GitHub Secrets
+CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
+CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
 
 # Function to authorize with a given key
-def authorize_client(key_index):
-    creds = ServiceAccountCredentials.from_json_keyfile_name(KEYS[key_index], SCOPE)
+def authorize_client(creds_json):
+    creds_dict = json.loads(creds_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
     return gspread.authorize(creds)
 
-# Start with the first key
-client = authorize_client(0)
-current_key_index = 0
+# Start with API Key 1
+client = authorize_client(CREDS_JSON_1)
+active_api = 1  # Track which API key is being used
 
 # Open the spreadsheet and access both Large Cap & Mid Cap sheets
 sheet = client.open("Stock Investment Analysis")
@@ -27,6 +29,13 @@ sheets_to_update = {
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap")
 }
+
+# 🔹 Function to switch API keys when hitting rate limits
+def switch_api_key():
+    global active_api, client
+    active_api = 2 if active_api == 1 else 1  # Toggle API key
+    client = authorize_client(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
+    print(f"🔄 Switched to API Key {active_api}")
 
 # Weight assignments for scoring
 WEIGHTS = {
@@ -151,9 +160,9 @@ for sheet_name, worksheet in sheets_to_update.items():
             except gspread.exceptions.APIError as e:
                 error_message = str(e)
                 if "429" in error_message:
-                    print(f"⚠️ Rate limit hit! Switching API keys...")
-                    current_key_index = (current_key_index + 1) % 2  # Switch between 0 and 1
-                    client = authorize_client(current_key_index)
+                    print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
+                    time.sleep(60)  # Wait for 60 seconds
+                    switch_api_key()  # Switch API Key
                     worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
                 else:
                     print(f"❌ Error batch updating {sheet_name} rows {row_numbers}: {e}")
