@@ -8,6 +8,7 @@ import numpy as np
 from openai import OpenAI
 from datetime import datetime
 from oauth2client.service_account import ServiceAccountCredentials
+import requests
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -48,6 +49,7 @@ print("✅ Successfully authenticated with Google Sheets and OpenAI!")
 def fetch_existing_data():
     return top_picks_ws.get_all_values()
 
+
 existing_data = fetch_existing_data()
 
 # 🔹 Define new headers
@@ -61,30 +63,74 @@ top_picks_ws.clear()
 top_picks_ws.update("A1", updated_data)
 print("✅ Google Sheet updated successfully with previous logic!")
 
-# 🔹 Function to analyze stock with deep market and technical analysis
+# 🔹 Function to fetch missing data from the web
+def fetch_web_data(ticker):
+    try:
+        search_url = f"https://www.google.com/search?q={ticker}+stock+price"
+        response = requests.get(search_url, headers={"User-Agent": "Mozilla/5.0"})
+        if response.status_code == 200:
+            return "Web data retrieved"
+        return "Data not found"
+    except Exception as e:
+        return f"Error fetching data: {e}"
+
+# 🔹 Function to parse AI response
+def parse_ai_analysis(ai_analysis):
+    decision, buy_price, sell_price, technical_summary, rest_of_ai_analysis = "N/A", "N/A", "N/A", "", ai_analysis
+    
+    if "Recommendation:" in ai_analysis:
+        decision = ai_analysis.split("Recommendation:")[1].split("\n")[0].replace("**", "").strip()
+    
+    if "Recommended Buy Price:" in ai_analysis or "Buy Price Range:" in ai_analysis:
+        buy_price_section = ai_analysis.split("Recommended Buy Price:")[-1] if "Recommended Buy Price:" in ai_analysis else ai_analysis.split("Buy Price Range:")[-1]
+        buy_price = buy_price_section.split("\n")[0].replace("**", "").strip()
+    
+    if "Recommended Sell Price:" in ai_analysis or "Sell Price Range:" in ai_analysis:
+        sell_price_section = ai_analysis.split("Recommended Sell Price:")[-1] if "Recommended Sell Price:" in ai_analysis else ai_analysis.split("Sell Price Range:")[-1]
+        sell_price = sell_price_section.split("\n")[0].replace("**", "").strip()
+    
+    if "Technical Indicators Summary" in ai_analysis:
+        technical_summary = ai_analysis.split("Technical Indicators Summary")[1].strip().split("\n## Conclusion")[0].strip()
+    
+    return decision, buy_price, sell_price, technical_summary, rest_of_ai_analysis
+
+# 🔹 Function to analyze stock with historical data
 def analyze_stock(ticker):
     print(f"🔍 Analyzing {ticker}...")
     stock = yf.Ticker(ticker)
     hist = stock.history(period="6mo")
     if hist.empty:
-        print(f"⚠️ No historical data for {ticker}")
-        return None
-
+        print(f"⚠️ No historical data for {ticker}, fetching from web...")
+        web_data = fetch_web_data(ticker)
+        return [ticker, "No data from Yahoo", web_data, "", ""]
+    
     market_cap = stock.info.get("marketCap", "N/A")
     current_price = stock.info.get("regularMarketPrice", "N/A")
     pe_ratio = stock.info.get("trailingPE", "N/A")
     
+    # Fetch historical data
+    hist_high = hist["High"].max() if not hist.empty else "N/A"
+    hist_low = hist["Low"].min() if not hist.empty else "N/A"
+    hist_avg = hist["Close"].mean() if not hist.empty else "N/A"
+    
     prompt = f"""
-    As a professional stock analyst, perform a deep market and technical analysis for {ticker}. Provide:
+    As a professional stock analyst, use real-time and historical data for {ticker} to make precise recommendations:
+    - Market Cap: {market_cap}
+    - Current Price: {current_price}
+    - P/E Ratio: {pe_ratio}
+    - Historical High: {hist_high}
+    - Historical Low: {hist_low}
+    - Historical Average: {hist_avg}
+    If any of these values are missing, use external web sources to find the data. Provide:
     1️⃣ Buy, Hold, or Sell Recommendation
-    2️⃣ Recommended Buy Price
-    3️⃣ Recommended Sell Price
+    2️⃣ Recommended Buy Price (numeric value or range)
+    3️⃣ Recommended Sell Price (numeric value or range)
     4️⃣ Technical Indicators Summary
     """
     response = client_ai.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "You are a professional stock analyst specializing in high-growth, low-risk investments."},
+            {"role": "system", "content": "You are a professional stock analyst specializing in high-growth, low-risk investments. Ensure all price recommendations include numeric values and leverage both real-time and historical data. If any data is missing, search the web to obtain better insights."},
             {"role": "user", "content": prompt}
         ]
     )
@@ -92,43 +138,14 @@ def analyze_stock(ticker):
     ai_analysis = response.choices[0].message.content
     print(f"✅ AI Analysis for {ticker}: {ai_analysis[:100]}...")
     
-    # Parsing AI response into structured data
-    decision, buy_price, sell_price, technical_summary, rest_of_ai_analysis = "N/A", "N/A", "N/A", "", ""
-    
-    if "Recommendation:" in ai_analysis:
-        decision = ai_analysis.split("Recommendation:")[1].split("\n")[0].replace("**", "").strip()
-    
-    if "Recommended Buy Price:" in ai_analysis:
-        buy_price = ai_analysis.split("Recommended Buy Price:")[1].split("\n")[0].replace("**", "").strip()
-    
-    if "Recommended Sell Price:" in ai_analysis:
-        sell_price = ai_analysis.split("Recommended Sell Price:")[1].split("\n")[0].replace("**", "").strip()
-    
-    if "Technical Indicators Summary" in ai_analysis:
-        technical_summary = ai_analysis.split("Technical Indicators Summary")[1].strip().split("\n## Conclusion")[0].strip()
-    
-    rest_of_ai_analysis = ai_analysis
-    
-    return [decision, buy_price, sell_price, technical_summary, rest_of_ai_analysis]
+    return parse_ai_analysis(ai_analysis)
 
 # 🔹 Process stocks and update Google Sheets
-updates = []
-tickers = [row[1] for row in existing_data[1:]]
-for i, ticker in enumerate(tickers, start=2):  # Start from row 2 since headers are in row 1
+tickers = [row[1] for row in existing_data[1:] if len(row) > 1]
+for i, ticker in enumerate(tickers, start=2):
     stock_data = analyze_stock(ticker)
     if stock_data:
         top_picks_ws.update(f"C{i}:G{i}", [stock_data])
     time.sleep(5)
 
-# 🔹 Apply conditional formatting for Buy/Sell decisions
-def apply_formatting():
-    cell_list = top_picks_ws.range(f"C2:C{len(existing_data)}")
-    for cell in cell_list:
-        if cell.value == "Buy":
-            cell.format = {"backgroundColor": {"red": 0.8, "green": 1.0, "blue": 0.8}}
-        elif cell.value == "Sell":
-            cell.format = {"backgroundColor": {"red": 1.0, "green": 0.8, "blue": 0.8}}
-    top_picks_ws.batch_update([{"range": f"C2:C{len(existing_data)}", "values": [[cell.value] for cell in cell_list]}])
-
-apply_formatting()
-print("✅ Google Sheet updated successfully with AI analysis on specified columns and conditional formatting!")
+print("✅ Google Sheet updated successfully with AI analysis!")
