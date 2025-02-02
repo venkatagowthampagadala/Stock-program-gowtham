@@ -1,33 +1,42 @@
-import os  # Required for environment variables
-import json  # Required for JSON parsing
+import os
+import json
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import pandas as pd
-import openai
 import time
 import yfinance as yf
+import pandas as pd
 import numpy as np
+from openai import OpenAI
+from datetime import datetime
+from oauth2client.service_account import ServiceAccountCredentials
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# 🔹 Load credentials from GitHub Secrets
-CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
-CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
+# 🔹 Load credentials from local JSON files
+CREDS_FILE_1 = r"C:\Users\venka\Downloads\stock-analysis-447717-f449ebc79388.json"
+CREDS_FILE_2 = r"C:\Users\venka\Downloads\stock-analysis-447717-6d99fc514040.json"
 
-# 🔹 OpenAI API Key
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai.api_key = OPENAI_API_KEY  # ✅ Set OpenAI Key
+# 🔹 OpenAI API Key (Set in Environment Variables)
+OPENAI_API_KEY = ""
 
-# Ensure json module is imported
-def authenticate_with_json(json_str):
-    creds_dict = json.loads(json_str)
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+# ✅ Initialize OpenAI Client
+client_ai = OpenAI(api_key=OPENAI_API_KEY)
+
+# 🔹 Function to authenticate with Google Sheets
+def authenticate_with_json(json_file):
+    creds = ServiceAccountCredentials.from_json_keyfile_name(json_file, SCOPE)
     return gspread.authorize(creds)
 
 # Start with API Key 1
-client = authenticate_with_json(CREDS_JSON_1)
+client = authenticate_with_json(CREDS_FILE_1)
 active_api = 1  # Track which API key is being used
+
+# 🔹 Function to switch API keys when hitting rate limits
+def switch_api_key():
+    global active_api, client
+    active_api = 2 if active_api == 1 else 1  # Toggle API key
+    client = authenticate_with_json(CREDS_FILE_2 if active_api == 2 else CREDS_FILE_1)
+    print(f"🔄 Switched to API Key {active_api}")
 
 # Open the spreadsheet and access the 'Top Picks' sheet
 sheet = client.open("Stock Investment Analysis")
@@ -35,139 +44,91 @@ top_picks_ws = sheet.worksheet("Top Picks")
 
 print("✅ Successfully authenticated with Google Sheets and OpenAI!")
 
-# 🔹 Function to switch API keys when hitting rate limits
-def switch_api_key():
-    global active_api, client
-    active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
-    print(f"🔄 Switched to API Key {active_api}")
+# 🔹 Fetch existing data
+def fetch_existing_data():
+    return top_picks_ws.get_all_values()
 
-# 🔹 Function to safely convert values
-def safe_convert(value):
-    """Convert values to JSON-compliant types and handle invalid floats."""
-    if isinstance(value, (pd.Series, pd.DataFrame)):
-        return value.iloc[0] if not value.empty else "N/A"
-    if isinstance(value, (np.int64, np.float64)):
-        value = value.item()
-    if isinstance(value, float):
-        if np.isnan(value) or np.isinf(value):  # Handle NaN, Infinity, and -Infinity
-            return "N/A"
-    return value
+existing_data = fetch_existing_data()
 
-# 🔹 Function to calculate RSI
-def calculate_rsi(prices, period=14):
-    try:
-        delta = prices.diff()
-        gain = delta.where(delta > 0, 0).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        return safe_convert(rsi.iloc[-1]) if not rsi.isna().iloc[-1] else "N/A"
-    except Exception as e:
-        print(f"❌ Error calculating RSI: {e}")
-        return "N/A"
+# 🔹 Define new headers
+new_headers = ["Rank", "Symbol", "AI Decision(Buy/Hold/Sell)", "AI Recommended Buy Price", "Recommended Sell Price", "Technical Indicators Summary", "Rest of AI Analysis"] + existing_data[0][2:]
 
-# 🔹 Fetch stock tickers from Google Sheets
-tickers = top_picks_ws.col_values(2)[1:]  # Read tickers from Column B (Symbol), skipping header
-print(f"✅ Found {len(tickers)} tickers to analyze.")
+# 🔹 Reorganize data by shifting columns to the right
+updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] for row in existing_data[1:]]
 
-# 🔹 Function to fetch stock data & OpenAI Analysis
+# 🔹 Update Google Sheets with existing data structure first
+top_picks_ws.clear()
+top_picks_ws.update("A1", updated_data)
+print("✅ Google Sheet updated successfully with previous logic!")
+
+# 🔹 Function to analyze stock with deep market and technical analysis
 def analyze_stock(ticker):
     print(f"🔍 Analyzing {ticker}...")
-
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="6mo")  # ✅ Fetch 6 months of data
-
-        if hist.empty:
-            print(f"⚠️ No historical data for {ticker}")
-            return None
-
-        # Extract Close prices and Volumes
-        prices = hist["Close"]
-        volumes = hist["Volume"]
-
-        # Market Cap and P/E Ratio
-        market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
-        pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
-
-        # Current Price (latest available close price)
-        current_price = safe_convert(prices.iloc[-1])
-
-        # RSI (14-day)
-        rsi = calculate_rsi(prices, period=14)
-
-        # VWMA (20-day)
-        vwma = safe_convert((prices * volumes).rolling(window=20).sum() / volumes.rolling(window=20).sum().iloc[-1])
-
-        # ATR (14-day)
-        atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
-
-        # OpenAI Analysis Prompt
-        prompt = f"""
-        Analyze the stock {ticker} based on:
-        - Market Cap: {market_cap}
-        - P/E Ratio: {pe_ratio}
-        - Current Price: {current_price}
-        - RSI (14-day): {rsi}
-        - VWMA (20-day): {vwma}
-        - ATR (14-day): {atr}
-        
-        Provide a risk assessment and recommendation (Buy, Hold, Sell) based on:
-        - Market Trends
-        - Volatility
-        - Technical Indicators
-        - Recent Performance
-        """
-
-        # ✅ FIX: Updated for OpenAI API v1+
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a professional stock analyst."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-
-        ai_analysis = response.choices[0].message["content"]  # ✅ Extract correct response
-        print(f"✅ AI Analysis for {ticker}: {ai_analysis[:100]}...")  # Print first 100 chars for preview
-
-        return [
-            ticker, market_cap, current_price, pe_ratio, rsi, vwma, atr, ai_analysis
-        ]
-
-    except Exception as e:
-        print(f"❌ Error processing {ticker}: {e}")
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="6mo")
+    if hist.empty:
+        print(f"⚠️ No historical data for {ticker}")
         return None
 
-# 🔹 Process stocks one by one and update Google Sheet
+    market_cap = stock.info.get("marketCap", "N/A")
+    current_price = stock.info.get("regularMarketPrice", "N/A")
+    pe_ratio = stock.info.get("trailingPE", "N/A")
+    
+    prompt = f"""
+    As a professional stock analyst, perform a deep market and technical analysis for {ticker}. Provide:
+    1️⃣ Buy, Hold, or Sell Recommendation
+    2️⃣ Recommended Buy Price
+    3️⃣ Recommended Sell Price
+    4️⃣ Technical Indicators Summary
+    """
+    response = client_ai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "You are a professional stock analyst specializing in high-growth, low-risk investments."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    
+    ai_analysis = response.choices[0].message.content
+    print(f"✅ AI Analysis for {ticker}: {ai_analysis[:100]}...")
+    
+    # Parsing AI response into structured data
+    decision, buy_price, sell_price, technical_summary, rest_of_ai_analysis = "N/A", "N/A", "N/A", "", ""
+    
+    if "Recommendation:" in ai_analysis:
+        decision = ai_analysis.split("Recommendation:")[1].split("\n")[0].replace("**", "").strip()
+    
+    if "Recommended Buy Price:" in ai_analysis:
+        buy_price = ai_analysis.split("Recommended Buy Price:")[1].split("\n")[0].replace("**", "").strip()
+    
+    if "Recommended Sell Price:" in ai_analysis:
+        sell_price = ai_analysis.split("Recommended Sell Price:")[1].split("\n")[0].replace("**", "").strip()
+    
+    if "Technical Indicators Summary" in ai_analysis:
+        technical_summary = ai_analysis.split("Technical Indicators Summary")[1].strip().split("\n## Conclusion")[0].strip()
+    
+    rest_of_ai_analysis = ai_analysis
+    
+    return [decision, buy_price, sell_price, technical_summary, rest_of_ai_analysis]
+
+# 🔹 Process stocks and update Google Sheets
 updates = []
-for idx, ticker in enumerate(tickers, start=2):  # Start from row 2
-    while True:
-        try:
-            stock_data = analyze_stock(ticker)
-            if stock_data is None:
-                print(f"⚠️ Skipping {ticker}: No data available.")
-                break  # Skip this row
+tickers = [row[1] for row in existing_data[1:]]
+for i, ticker in enumerate(tickers, start=2):  # Start from row 2 since headers are in row 1
+    stock_data = analyze_stock(ticker)
+    if stock_data:
+        top_picks_ws.update(f"C{i}:G{i}", [stock_data])
+    time.sleep(5)
 
-            updates.append(stock_data)
+# 🔹 Apply conditional formatting for Buy/Sell decisions
+def apply_formatting():
+    cell_list = top_picks_ws.range(f"C2:C{len(existing_data)}")
+    for cell in cell_list:
+        if cell.value == "Buy":
+            cell.format = {"backgroundColor": {"red": 0.8, "green": 1.0, "blue": 0.8}}
+        elif cell.value == "Sell":
+            cell.format = {"backgroundColor": {"red": 1.0, "green": 0.8, "blue": 0.8}}
+    top_picks_ws.batch_update([{"range": f"C2:C{len(existing_data)}", "values": [[cell.value] for cell in cell_list]}])
 
-            time.sleep(5)  # ✅ Prevent hitting API limits
-            break  # Successfully analyzed, break retry loop
-
-        except gspread.exceptions.APIError as e:
-            if "429" in str(e):  # Detect API Rate Limit error
-                print(f"⚠️ Rate limit hit! Switching API keys...")
-                switch_api_key()
-                sheet = client.open("Stock Investment Analysis")
-                top_picks_ws = sheet.worksheet("Top Picks")  # Re-authenticate the sheet
-            else:
-                print(f"❌ Error updating {ticker}: {e}")
-                break  # Move to next stock
-
-# 🔹 Update Google Sheets with AI Analysis
-if updates:
-    top_picks_ws.update("A2", updates)
-    print(f"✅ Updated 'Top Picks' sheet with AI analysis for {len(updates)} stocks.")
-
-print("🎯 Analysis Completed!")
+apply_formatting()
+print("✅ Google Sheet updated successfully with AI analysis on specified columns and conditional formatting!")
