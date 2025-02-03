@@ -45,13 +45,14 @@ df_super_green = pd.DataFrame(super_green_data[1:], columns=super_green_data[0])
 numeric_cols = [
     "Market Cap", "Current Price", "VWMA", "EMA", "ATR",
     "1 Month Price Change", "1 Week Price Change", "1 Day Price Change",
-    "Volume", "RSI", "Sentiment Ratio", "Score"
+    "Volume", "RSI", "Sentiment Ratio", "Score","P/E"
 ]
 
 def clean_float(value):
-    """Safely convert values to float, returning 0.0 for invalid numbers."""
+    """Safely convert values to float, ensuring they remain as numbers and not percentages."""
     try:
-        return float(str(value).replace('%', '').strip())  # Remove % if present
+        value = str(value).replace('%', '').strip()  # Remove % if present
+        return float(value) if value else 0.0
     except ValueError:
         return 0.0
 
