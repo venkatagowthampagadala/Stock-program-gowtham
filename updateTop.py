@@ -49,12 +49,16 @@ numeric_cols = [
 ]
 
 def clean_float(value):
-    """Safely convert values to float, ensuring they remain as numbers and not percentages."""
+    """Safely convert values to float, ensuring they are valid numbers."""
     try:
         value = str(value).replace('%', '').strip()  # Remove % if present
-        return float(value) if value else 0.0
+        float_value = float(value) if value else float("nan")  # Convert empty strings to NaN
+        if not np.isfinite(float_value):  # Check for NaN, inf, or extremely large values
+            return "N/A"
+        return float_value
     except ValueError:
-        return 0.0
+        return "N/A"  # Return "N/A" for invalid numeric values
+
 
 for col in numeric_cols:
     df_super_green[col] = df_super_green[col].apply(clean_float)
@@ -114,10 +118,11 @@ df_top_picks = df_top_picks[[col for col in column_order if col in df_top_picks.
 df_top_picks["Latest News Date"] = df_top_picks["Latest News Date"].dt.strftime("%Y-%m-%d %H:%M:%S").fillna("N/A")
 df_top_picks["News Update Date"] = df_top_picks["News Update Date"].astype(str)
 
-# Convert DataFrame to list of lists (for Google Sheets update)
-top_picks_data = [df_top_picks.columns.tolist()] + df_top_picks.values.tolist()
 
-# Clear and update the "Top Picks" sheet
+# ✅ Convert DataFrame to list of lists (for Google Sheets update)
+top_picks_data = [df_top_picks.columns.tolist()] + df_top_picks.astype(str).values.tolist()  # Convert all to string
+
+# ✅ Clear and update the "Top Picks" sheet safely
 retry = True
 while retry:
     try:
