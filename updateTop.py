@@ -118,7 +118,7 @@ df_top_picks = df_top_picks[[col for col in column_order if col in df_top_picks.
 df_top_picks["Latest News Date"] = df_top_picks["Latest News Date"].dt.strftime("%Y-%m-%d %H:%M:%S").fillna("N/A")
 df_top_picks["News Update Date"] = df_top_picks["News Update Date"].astype(str)
 
-
+df_top_picks.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
 # ✅ Convert DataFrame to list of lists (for Google Sheets update)
 top_picks_data = [df_top_picks.columns.tolist()] + df_top_picks.astype(str).values.tolist()  # Convert all to string
 
