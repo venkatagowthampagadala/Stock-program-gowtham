@@ -5,6 +5,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import time
 from datetime import datetime, timedelta
+import numpy as np 
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
