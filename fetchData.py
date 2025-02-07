@@ -27,8 +27,7 @@ active_api = 1  # Track which API key is being used
 # Open the main spreadsheet and access both Large Cap & Mid Cap sheets
 sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
-    "Large Cap": sheet.worksheet("Large Cap"),
-    "Mid Cap": sheet.worksheet("Mid Cap"),
+   
     "Technology":sheet.worksheet("Technology")
 }
 
