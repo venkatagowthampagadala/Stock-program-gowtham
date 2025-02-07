@@ -27,6 +27,7 @@ sheet = client.open("Stock Investment Analysis")
 large_cap_ws = sheet.worksheet("Large Cap")
 mid_cap_ws = sheet.worksheet("Mid Cap")
 hybrid_ws = sheet.worksheet("Hybrid")
+technology_ws = sheet.worksheet("Technology") 
 super_green_ws = sheet.worksheet("Super Green")  # ✅ Super Green Sheet
 
 # 🔹 Function to switch API keys when hitting rate limits
@@ -39,10 +40,12 @@ def switch_api_key():
 # Fetch data from Large Cap & Mid Cap sheets
 large_cap_data = large_cap_ws.get_all_values()
 mid_cap_data = mid_cap_ws.get_all_values()
+technology_data = technology_ws.get_all_values()
 
 # Convert to DataFrame, using first row as column headers
 df_large = pd.DataFrame(large_cap_data[1:], columns=large_cap_data[0])
 df_mid = pd.DataFrame(mid_cap_data[1:], columns=mid_cap_data[0])
+df_technology = pd.DataFrame(technology_data[1:], columns=technology_data[0])  # ✅ New
 
 # Convert necessary columns to numeric
 numeric_cols = [
@@ -57,13 +60,14 @@ def clean_float(value):
     except ValueError:
         return 0.0
 
-for df in [df_large, df_mid]:
+for df in [df_large, df_mid, df_technology]:
     for col in numeric_cols:
         df[col] = df[col].apply(clean_float)
 
 # 🔹 Process Large Cap & Mid Cap stocks **separately first** before comparison
 eligible_large_cap = []
 eligible_mid_cap = []
+eligible_technology = [] 
 super_green_stocks = []  # ✅ Super Green stocks list
 
 # Process Large Cap Stocks
