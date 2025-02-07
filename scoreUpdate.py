@@ -27,7 +27,8 @@ active_api = 1  # Track which API key is being used
 sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
     "Large Cap": sheet.worksheet("Large Cap"),
-    "Mid Cap": sheet.worksheet("Mid Cap")
+    "Mid Cap": sheet.worksheet("Mid Cap"),
+    "Technology":sheet.worksheet("Technology")
 }
 
 # 🔹 Function to switch API keys when hitting rate limits
