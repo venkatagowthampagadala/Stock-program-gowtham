@@ -1,8 +1,12 @@
+import os  # Required for environment variables
+import yfinance as yf
+from oauth2client.service_account import ServiceAccountCredentials
+import time
+import pandas as pd
+import numpy as np
 import gspread
 import json
-import time
 import openai
-from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 import re  # ✅ Ensure `re` is imported for regex parsing
 from gspread_formatting import format_cell_range, CellFormat, Color
