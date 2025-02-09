@@ -25,4 +25,4 @@ jobs:
           GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
           GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python updateTop.py
+        run: python AiAnalysis.py
