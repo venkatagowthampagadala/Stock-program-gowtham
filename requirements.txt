@@ -6,3 +6,4 @@ yfinance
 openai
 beautifulsoup4
 requests
+gspread-formatting
