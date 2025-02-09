@@ -120,9 +120,35 @@ for idx, row in df_mid.iterrows():
         print(f"🚀 Super Green Stock Identified: {stock_data['Symbol']}")
 
     time.sleep(0.2)  # ✅ Avoid rate limits
+# Process Technology Cap Stocks
+for idx, row in df_technology.iterrows():
+    stock_data = row.to_dict()
+    stock_data["VWMA vs Current Price"] = stock_data["Current Price"] - stock_data["VWMA"]
+
+    print(f"🔍 Checking Technology Cap: {stock_data['Symbol']}")
+
+    # **Momentum Technology Cap Stock Criteria**
+    if (
+        stock_data["1 Month Price Change"] > 5
+        and stock_data["1 Week Price Change"] > 3
+        and 50 <= stock_data["RSI"] <= 75
+        and stock_data["Current Price"] > stock_data["VWMA"]
+        and stock_data["Volume"] > df_technology["Volume"].mean() * 1.2
+        and stock_data["Sentiment Ratio"] > 0.7
+    ):
+        eligible_technology.append(stock_data)
+        print(f"✅ Momentum Technology Identified: {stock_data['Symbol']}")
+
+    # **Super Green Criteria**
+    if stock_data["Score"] >= 6.8:
+        super_green_stocks.append(stock_data)
+        print(f"🚀 Super Green Stock Identified: {stock_data['Symbol']}")
+
+    time.sleep(0.2)  # ✅ Avoid rate limits
+
 
 # 🔹 Merge the two lists for Hybrid stocks
-hybrid_stocks = eligible_large_cap + eligible_mid_cap
+hybrid_stocks = eligible_large_cap + eligible_mid_cap + eligible_technology
 
 # Convert to DataFrame
 df_hybrid = pd.DataFrame(hybrid_stocks)
