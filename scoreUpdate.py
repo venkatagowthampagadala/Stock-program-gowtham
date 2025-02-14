@@ -66,18 +66,24 @@ def news_score_adjustment(news_age, sentiment_ratio):
 
 # Scoring function
 def calculate_score(row):
-    score = (
-        row["1 Month Price Change"] * WEIGHTS["1 Month Price Change"] +
-        row["1 Week Price Change"] * WEIGHTS["1 Week Price Change"] +
-        row["1 Day Price Change"] * WEIGHTS["1 Day Price Change"] +
-        row["Volume"] * WEIGHTS["Volume"] +
-        row["RSI"] * WEIGHTS["RSI"] if 30 <= row["RSI"] <= 70 else 0 +
-        row["Sentiment Ratio"] * WEIGHTS["Sentiment Ratio"] +
-        row["ATR"] * WEIGHTS["ATR"] +
-        (WEIGHTS["VWMA vs Current Price"] if row["VWMA vs Current Price"] > 0 else 0) +
-        news_score_adjustment(row["News Age"], row["Sentiment Ratio"])
-    )
-    return round(score, 2)
+    # Ensure all values are numeric
+    try:
+        score = (
+            float(row["1 Month Price Change"]) * WEIGHTS["1 Month Price Change"] +
+            float(row["1 Week Price Change"]) * WEIGHTS["1 Week Price Change"] +
+            float(row["1 Day Price Change"]) * WEIGHTS["1 Day Price Change"] +
+            float(row["Volume"]) * WEIGHTS["Volume"] +
+            (float(row["RSI"]) * WEIGHTS["RSI"] if 30 <= float(row["RSI"]) <= 70 else 0) +
+            float(row["Sentiment Ratio"]) * WEIGHTS["Sentiment Ratio"] +
+            float(row["ATR"]) * WEIGHTS["ATR"] +
+            (WEIGHTS["VWMA vs Current Price"] if float(row["VWMA vs Current Price"]) > 0 else 0) +
+            news_score_adjustment(float(row["News Age"]), float(row["Sentiment Ratio"]))
+        )
+        return round(score, 2)
+    except (ValueError, TypeError) as e:
+        print(f"❌ Error calculating score for row: {e}")
+        return 0  # Return 0 if there's an error
+
 
 # Categorization function
 def categorize_score(score):
@@ -106,8 +112,7 @@ for sheet_name, worksheet in sheets_to_update.items():
         "Volume", "RSI", "VWMA", "Current Price", "EMA", "ATR", "Sentiment Ratio"
     ]
     for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-        df["Current Price"] = df["Current Price"].replace(0.0, "N/A")
+        df[col] = pd.to_numeric(df[col].str.replace('%', ''), errors='coerce').fillna(0)
 
     # Convert "Latest News Date" to datetime format
     df["Latest News Date"] = pd.to_datetime(df["Latest News Date"], errors='coerce')
