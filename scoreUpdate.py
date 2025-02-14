@@ -125,9 +125,7 @@ for sheet_name, worksheet in sheets_to_update.items():
     df["Volume"] /= 1e6
     df["ATR"] = 1 / (df["ATR"] + 1)
     # Replace NaN, inf, and -inf with "N/A"
-    df_combined.replace([np.nan, np.inf, -np.inf], "N/A", inplace=True)
-    
-
+    df.replace([np.nan, np.inf, -np.inf], "N/A", inplace=True) 
 
     # Process in **batches of 10 rows at a time**
     batch_size = 10
