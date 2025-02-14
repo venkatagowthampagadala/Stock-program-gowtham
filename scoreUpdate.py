@@ -113,8 +113,7 @@ for sheet_name, worksheet in sheets_to_update.items():
     # Compute News Age (Days)
     today = datetime.today()
     df["News Age"] = (today - df["Latest News Date"]).dt.days.fillna(999)
-    # Ensure News Age is not negative
-    df_combined["News Age"] = df_combined["News Age"].apply(lambda x: max(x, 0))
+
     
     # Add VWMA vs Current Price column
     df["VWMA vs Current Price"] = df["Current Price"] - df["VWMA"]
