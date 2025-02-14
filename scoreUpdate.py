@@ -104,7 +104,8 @@ for sheet_name, worksheet in sheets_to_update.items():
         "Volume", "RSI", "VWMA", "Current Price", "EMA", "ATR", "Sentiment Ratio"
     ]
     for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        df["Current Price"] = df["Current Price"].replace(0.0, "N/A")
 
     # Convert "Latest News Date" to datetime format
     df["Latest News Date"] = pd.to_datetime(df["Latest News Date"], errors='coerce')
