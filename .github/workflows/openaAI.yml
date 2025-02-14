@@ -2,7 +2,9 @@ name: AI Stock Analysis
 
 on:
   schedule:
+    - cron: "0 0 * * 1-5"  # Runs at the start of every hour from 6 AM - 8 PM (Monday-Friday)
   workflow_dispatch:  # Allows manual trigger
+
 
 jobs:
   run-script:
