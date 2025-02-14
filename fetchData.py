@@ -114,6 +114,10 @@ def get_stock_data(ticker, max_retries=3):
 
             # Yesterday's Close Price
             yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
+            # Check if current_price is zero or N/A and assign yesterday_close_price
+            if current_price == 0 or current_price == "N/A":
+                current_price = yesterday_close_price
+                print(f"🔄 Current price for {ticker} set to yesterday's close: {current_price}")
 
             # 1-Day Price Change
             percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
