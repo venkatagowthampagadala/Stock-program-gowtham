@@ -54,11 +54,12 @@ numeric_cols = [
 ]
 
 def clean_float(value):
-    """Safely convert values to float, returning 0.0 for invalid numbers."""
     try:
-        return float(str(value).replace('%', '').strip())  # Remove % if present
+        value = float(str(value).replace('%', '').strip())
+        return value if value != 0 else "N/A"  # Return "N/A" if value is 0
     except ValueError:
-        return 0.0
+        return "N/A"
+
 
 for df in [df_large, df_mid, df_technology]:
     for col in numeric_cols:
