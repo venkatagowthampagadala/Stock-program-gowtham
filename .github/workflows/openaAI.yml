@@ -21,9 +21,14 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Run AI Stock Analysis
+      - name: Run Update Hybrid Script
         env:
           GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
           GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python updateHybrid.py
+
+      - name: Run Update Top Picks Script
+        env:
+          GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
+          GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
+        run: python updateTop.py
