@@ -127,6 +127,9 @@ column_order = [
     "News Link 1", "News Link 2", "News Link 3", "News Link 4", "News Link 5", "News Update Date", "Adjusted Score", "VWMA vs Current Price"
 ]
 
+# Remove duplicates based on the "Symbol" column, keeping the first occurrence
+df_top_picks = df_top_picks.drop_duplicates(subset="Symbol", keep="first")
+
 # Ensure only existing columns are included
 df_top_picks = df_top_picks[[col for col in column_order if col in df_top_picks.columns]]
 
