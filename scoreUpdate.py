@@ -113,7 +113,9 @@ for sheet_name, worksheet in sheets_to_update.items():
     # Compute News Age (Days)
     today = datetime.today()
     df["News Age"] = (today - df["Latest News Date"]).dt.days.fillna(999)
-
+    # Ensure News Age is not negative
+    df_combined["News Age"] = df_combined["News Age"].apply(lambda x: max(x, 0))
+    
     # Add VWMA vs Current Price column
     df["VWMA vs Current Price"] = df["Current Price"] - df["VWMA"]
 
@@ -123,6 +125,10 @@ for sheet_name, worksheet in sheets_to_update.items():
     df["1 Month Price Change"] *= 100
     df["Volume"] /= 1e6
     df["ATR"] = 1 / (df["ATR"] + 1)
+    # Replace NaN, inf, and -inf with "N/A"
+    df_combined.replace([np.nan, np.inf, -np.inf], "N/A", inplace=True)
+    
+
 
     # Process in **batches of 10 rows at a time**
     batch_size = 10
