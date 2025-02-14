@@ -5,8 +5,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import time
 from datetime import datetime, timedelta
-import numpy as np
-
 
 # 🔹 Google Sheets API Setup with Two Keys
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -66,24 +64,18 @@ def news_score_adjustment(news_age, sentiment_ratio):
 
 # Scoring function
 def calculate_score(row):
-    # Ensure all values are numeric
-    try:
-        score = (
-            float(row["1 Month Price Change"]) * WEIGHTS["1 Month Price Change"] +
-            float(row["1 Week Price Change"]) * WEIGHTS["1 Week Price Change"] +
-            float(row["1 Day Price Change"]) * WEIGHTS["1 Day Price Change"] +
-            float(row["Volume"]) * WEIGHTS["Volume"] +
-            (float(row["RSI"]) * WEIGHTS["RSI"] if 30 <= float(row["RSI"]) <= 70 else 0) +
-            float(row["Sentiment Ratio"]) * WEIGHTS["Sentiment Ratio"] +
-            float(row["ATR"]) * WEIGHTS["ATR"] +
-            (WEIGHTS["VWMA vs Current Price"] if float(row["VWMA vs Current Price"]) > 0 else 0) +
-            news_score_adjustment(float(row["News Age"]), float(row["Sentiment Ratio"]))
-        )
-        return round(score, 2)
-    except (ValueError, TypeError) as e:
-        print(f"❌ Error calculating score for row: {e}")
-        return 0  # Return 0 if there's an error
-
+    score = (
+        row["1 Month Price Change"] * WEIGHTS["1 Month Price Change"] +
+        row["1 Week Price Change"] * WEIGHTS["1 Week Price Change"] +
+        row["1 Day Price Change"] * WEIGHTS["1 Day Price Change"] +
+        row["Volume"] * WEIGHTS["Volume"] +
+        row["RSI"] * WEIGHTS["RSI"] if 30 <= row["RSI"] <= 70 else 0 +
+        row["Sentiment Ratio"] * WEIGHTS["Sentiment Ratio"] +
+        row["ATR"] * WEIGHTS["ATR"] +
+        (WEIGHTS["VWMA vs Current Price"] if row["VWMA vs Current Price"] > 0 else 0) +
+        news_score_adjustment(row["News Age"], row["Sentiment Ratio"])
+    )
+    return round(score, 2)
 
 # Categorization function
 def categorize_score(score):
@@ -112,8 +104,7 @@ for sheet_name, worksheet in sheets_to_update.items():
         "Volume", "RSI", "VWMA", "Current Price", "EMA", "ATR", "Sentiment Ratio"
     ]
     for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col].astype(str).str.replace('%', ''), errors='coerce').fillna(0)
-
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
 
     # Convert "Latest News Date" to datetime format
     df["Latest News Date"] = pd.to_datetime(df["Latest News Date"], errors='coerce')
@@ -122,7 +113,6 @@ for sheet_name, worksheet in sheets_to_update.items():
     today = datetime.today()
     df["News Age"] = (today - df["Latest News Date"]).dt.days.fillna(999)
 
-    
     # Add VWMA vs Current Price column
     df["VWMA vs Current Price"] = df["Current Price"] - df["VWMA"]
 
@@ -132,8 +122,6 @@ for sheet_name, worksheet in sheets_to_update.items():
     df["1 Month Price Change"] *= 100
     df["Volume"] /= 1e6
     df["ATR"] = 1 / (df["ATR"] + 1)
-    # Replace NaN, inf, and -inf with "N/A"
-    df.replace([np.nan, np.inf, -np.inf], "N/A", inplace=True) 
 
     # Process in **batches of 10 rows at a time**
     batch_size = 10
