@@ -27,7 +27,8 @@ active_api = 1  # Track which API key is being used
 # Open the main spreadsheet and access sheets
 sheet = client.open("Stock Investment Analysis")
 super_green_ws = sheet.worksheet("Super Green")
-top_picks_ws = sheet.worksheet("Top Picks")  # ✅ Updated to "Top Picks"
+top_picks_ws = sheet.worksheet("Top Picks")
+hybrid_ws = sheet.worksheet("Hybrid") # ✅ Updated to "Top Picks"
 
 # 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
@@ -35,6 +36,13 @@ def switch_api_key():
     active_api = 2 if active_api == 1 else 1  # Toggle API key
     client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
+# Fetch data from the Hybrid sheet
+hybrid_data = hybrid_ws.get_all_values()
+
+# Convert to DataFrame using the first row as column headers
+df_hybrid = pd.DataFrame(hybrid_data[1:], columns=hybrid_data[0])
+
+
 
 # Fetch data from Super Green sheet
 super_green_data = super_green_ws.get_all_values()
@@ -63,24 +71,31 @@ def clean_float(value):
 
 for col in numeric_cols:
     df_super_green[col] = df_super_green[col].apply(clean_float)
+# Convert necessary columns to numeric using the clean_float function
+for col in numeric_cols:
+    if col in df_hybrid.columns:
+        df_hybrid[col] = df_hybrid[col].apply(clean_float)
+
+# Merge Super Green and Hybrid data
+df_combined = pd.concat([df_super_green, df_hybrid], ignore_index=True)
 
 # Convert "Latest News Date" to datetime format and specify day-first format
-df_super_green["Latest News Date"] = pd.to_datetime(df_super_green["Latest News Date"], format="%d-%m-%Y %H:%M:%S", errors='coerce')
+df_combined["Latest News Date"] = pd.to_datetime(df_combined["Latest News Date"], format="%d-%m-%Y %H:%M:%S", errors='coerce')
 
 # Calculate News Age (Days)
 today = datetime.today()
-df_super_green["News Age"] = (today - df_super_green["Latest News Date"]).dt.days.fillna(999)
+df_combined["News Age"] = (today - df_combined["Latest News Date"]).dt.days.fillna(999)
 
 # **Modify Score Based on News Age:**
 # - Stocks with recent news (≤90 days) maintain their score.
 # - Stocks with news older than 90 days get their score reduced by 20%.
-df_super_green["Adjusted Score"] = df_super_green.apply(
+df_combined["Adjusted Score"] = df_combined.apply(
     lambda row: row["Score"] * 0.8 if row["News Age"] > 90 else row["Score"], axis=1
 )
 
 # 🔹 Rank stocks based on adjusted score
-df_super_green = df_super_green.sort_values(by="Adjusted Score", ascending=False)
-df_super_green["Rank"] = range(1, len(df_super_green) + 1)
+df_combined = df_combined.sort_values(by="Adjusted Score", ascending=False)
+df_combined["Rank"] = range(1, len(df_combined) + 1)
 
 # 🔹 Calculate Stop Price, Buy Price, Sell Price
 def calculate_prices(row):
@@ -98,10 +113,10 @@ def calculate_prices(row):
 
     return pd.Series([stop_price, buy_price, sell_price])
 
-df_super_green[["Stop Price", "Buy Price", "Sell Price"]] = df_super_green.apply(calculate_prices, axis=1)
+df_combined[["Stop Price", "Buy Price", "Sell Price"]] = df_combined.apply(calculate_prices, axis=1)
 
 # **All high-potential stocks included (not limited to 30)**
-df_top_picks = df_super_green.copy()
+df_top_picks = df_combined.copy()
 
 # Reorder columns to match the required format
 column_order = [
