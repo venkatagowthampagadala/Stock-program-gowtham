@@ -154,7 +154,7 @@ def get_stock_data(ticker, max_retries=3):
             error_msg = str(e)
             if "Too Many Requests" in error_msg:
                 print(f"⚠️ YFinance Rate Limit hit for {ticker}. Pausing for 60 seconds...")
-                time.sleep(60)  # ✅ Pause for 60 seconds before retrying
+                time.sleep(20)  # ✅ Pause for 60 seconds before retrying
                 retries += 1
             else:
                 print(f"❌ Error fetching data for {ticker}: {e}")
@@ -182,7 +182,7 @@ for sheet_name, worksheet in sheets_to_update.items():
                 worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])
                 print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
 
-                time.sleep(0.2)  # ✅ Maintain 0.5-second delay
+                  # ✅ Maintain 0.5-second delay
                 break  
 
             except gspread.exceptions.APIError as e:
