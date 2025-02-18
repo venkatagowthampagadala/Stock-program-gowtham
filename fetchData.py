@@ -31,8 +31,7 @@ sheets_to_update = {
     "SP Tracker":sheet.worksheet("S&P Tracker"),
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
-    "Technology":sheet.worksheet("Technology")
-    
+    "Technology":sheet.worksheet("Technology")    
 }
 
 # 🔹 Function to switch API keys when hitting rate limits
@@ -49,7 +48,6 @@ def switch_api_key():
         client = authenticate_with_json(CREDS_JSON_1)
 
     print(f"🔄 Switched to API Key {active_api}")
-
 # 🔹 Function to fetch tickers from a Google Sheet
 def fetch_tickers(worksheet):
     try:
