@@ -29,7 +29,8 @@ sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
-    "Technology":sheet.worksheet("Technology")
+    "Technology":sheet.worksheet("Technology"),
+    "SP Tracker":sheet.worksheet("S&P Tracker")
 }
 
 # 🔹 Function to switch API keys when hitting rate limits
