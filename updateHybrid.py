@@ -11,6 +11,7 @@ SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 # 🔹 Load credentials from GitHub Secrets
 CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
 CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
+CREDS_JSON_3 = os.getenv("GOOGLE_CREDENTIALS_3")
 
 # 🔹 Function to authenticate with Google Sheets using JSON from environment variables
 def authenticate_with_json(json_str):
@@ -33,8 +34,16 @@ super_green_ws = sheet.worksheet("Super Green")  # ✅ Super Green Sheet
 # 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
-    active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
+    if active_api == 1:
+        active_api = 2
+        client = authenticate_with_json(CREDS_JSON_2)
+    elif active_api == 2:
+        active_api = 3
+        client = authenticate_with_json(CREDS_JSON_3)
+    else:
+        active_api = 1  # Loop back to first key after third key
+        client = authenticate_with_json(CREDS_JSON_1)
+
     print(f"🔄 Switched to API Key {active_api}")
 
 # Fetch data from Large Cap & Mid Cap sheets
