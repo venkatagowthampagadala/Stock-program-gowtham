@@ -192,13 +192,13 @@ for sheet_name, worksheet in sheets_to_update.items():
                 worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])
                 print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
 
-                time.sleep(0.2)  # ✅ Maintain 0.5-second delay
+                time.sleep(0.1)  # ✅ Maintain 0.5-second delay
                 break  
 
             except gspread.exceptions.APIError as e:
                 if "429" in str(e):
                     print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
-                    time.sleep(10)  
+                    time.sleep(5)  
                     switch_api_key()
                     worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
                 else:
