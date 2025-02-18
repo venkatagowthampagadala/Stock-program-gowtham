@@ -25,10 +25,5 @@ jobs:
         env:
           GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
           GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
-        run: python updateHybrid.py
+        run: python fetchData.py
 
-      - name: Run Update Top Picks Script
-        env:
-          GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
-          GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
-        run: python updateTop.py
