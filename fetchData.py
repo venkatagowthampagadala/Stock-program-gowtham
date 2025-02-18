@@ -28,10 +28,11 @@ active_api = 1  # Track which API key is being used
 # Open the main spreadsheet and access both Large Cap & Mid Cap sheets
 sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
+    "SP Tracker":sheet.worksheet("S&P Tracker"),
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
-    "Technology":sheet.worksheet("Technology"),
-    "SP Tracker":sheet.worksheet("S&P Tracker")
+    "Technology":sheet.worksheet("Technology")
+    
 }
 
 # 🔹 Function to switch API keys when hitting rate limits
