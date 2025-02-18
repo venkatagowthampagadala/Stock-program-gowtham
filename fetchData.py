@@ -164,6 +164,8 @@ def get_stock_data(ticker, max_retries=3):
     return None  # Skip stock if all retries fail
 
 # 🔹 Process each ticker row-by-row
+api_call_count = 0  # Track number of API calls
+
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
 
@@ -182,7 +184,14 @@ for sheet_name, worksheet in sheets_to_update.items():
                 worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])
                 print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
 
-                  # ✅ Maintain 0.5-second delay
+                # ✅ Increment API call count
+                api_call_count += 1
+
+                # ✅ Switch API keys every 20 calls
+                if api_call_count % 20 == 0:
+                    print(f"🔄 Switching API key after 20 calls...  {api_call_count}")
+                    switch_api_key()
+
                 break  
 
             except gspread.exceptions.APIError as e:
@@ -195,4 +204,5 @@ for sheet_name, worksheet in sheets_to_update.items():
                     print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
                     break  
 
-print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated!") 
+print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated!")
+
