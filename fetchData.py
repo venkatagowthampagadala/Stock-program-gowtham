@@ -188,7 +188,7 @@ for sheet_name, worksheet in sheets_to_update.items():
                 api_call_count += 1
 
                 # ✅ Switch API keys every 20 calls
-                if api_call_count % 20 == 0:
+                if api_call_count % 15 == 0:
                     print(f"🔄 Switching API key after 20 calls...  {api_call_count}")
                     switch_api_key()
 
