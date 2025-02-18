@@ -13,7 +13,6 @@ SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 # 🔹 Load credentials from GitHub Secrets
 CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
 CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
-CREDS_JSON_3 = os.getenv("GOOGLE_CREDENTIALS_3")
 
 # 🔹 Function to authenticate with Google Sheets using JSON from environment variables
 def authenticate_with_json(json_str):
@@ -28,26 +27,19 @@ active_api = 1  # Track which API key is being used
 # Open the main spreadsheet and access both Large Cap & Mid Cap sheets
 sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
-    "SP Tracker":sheet.worksheet("S&P Tracker"),
+    "SP Tracker":sheet.worksheet("SP Tracker"),
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
-    "Technology":sheet.worksheet("Technology")    
+    "Technology":sheet.worksheet("Technology")
 }
 
 # 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
-    if active_api == 1:
-        active_api = 2
-        client = authenticate_with_json(CREDS_JSON_2)
-    elif active_api == 2:
-        active_api = 3
-        client = authenticate_with_json(CREDS_JSON_3)
-    else:
-        active_api = 1  # Loop back to first key after third key
-        client = authenticate_with_json(CREDS_JSON_1)
-
+    active_api = 2 if active_api == 1 else 1  # Toggle API key
+    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
+
 # 🔹 Function to fetch tickers from a Google Sheet
 def fetch_tickers(worksheet):
     try:
