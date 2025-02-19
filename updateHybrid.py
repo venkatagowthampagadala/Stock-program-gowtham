@@ -4,6 +4,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import time
+import numpy as np 
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -25,6 +26,7 @@ active_api = 1  # Track which API key is being used
 # Open the main spreadsheet and access sheets
 sheet = client.open("Stock Investment Analysis")
 large_cap_ws = sheet.worksheet("Large Cap")
+sp_tracker_ws = sheet.worksheet("SP Tracker")
 mid_cap_ws = sheet.worksheet("Mid Cap")
 hybrid_ws = sheet.worksheet("Hybrid")
 technology_ws = sheet.worksheet("Technology") 
@@ -41,11 +43,15 @@ def switch_api_key():
 large_cap_data = large_cap_ws.get_all_values()
 mid_cap_data = mid_cap_ws.get_all_values()
 technology_data = technology_ws.get_all_values()
+sp_tracker_data = sp_tracker_ws.get_all_values()
+
 
 # Convert to DataFrame, using first row as column headers
 df_large = pd.DataFrame(large_cap_data[1:], columns=large_cap_data[0])
 df_mid = pd.DataFrame(mid_cap_data[1:], columns=mid_cap_data[0])
 df_technology = pd.DataFrame(technology_data[1:], columns=technology_data[0])  # ✅ New
+df_sp_tracker = pd.DataFrame(sp_tracker_data[1:], columns=sp_tracker_data[0])
+
 
 # Convert necessary columns to numeric
 numeric_cols = [
@@ -60,7 +66,7 @@ def clean_float(value):
     except ValueError:
         return 0.0
 
-for df in [df_large, df_mid, df_technology]:
+for df in [df_large, df_mid, df_technology,df_sp_tracker]:
     for col in numeric_cols:
         df[col] = df[col].apply(clean_float)
 
@@ -69,6 +75,7 @@ eligible_large_cap = []
 eligible_mid_cap = []
 eligible_technology = [] 
 super_green_stocks = []  # ✅ Super Green stocks list
+eligible_sp_tracker = []  # ✅ Create a list for eligible stocks
 
 # Process Large Cap Stocks
 for idx, row in df_large.iterrows():
@@ -93,7 +100,7 @@ for idx, row in df_large.iterrows():
         super_green_stocks.append(stock_data)
         print(f"🚀 Super Green Stock Identified: {stock_data['Symbol']}")
 
-    time.sleep(0.2)  # ✅ Avoid rate limits
+    time.sleep(0.1)  # ✅ Avoid rate limits
 
 # Process Mid Cap Stocks
 for idx, row in df_mid.iterrows():
@@ -119,7 +126,7 @@ for idx, row in df_mid.iterrows():
         super_green_stocks.append(stock_data)
         print(f"🚀 Super Green Stock Identified: {stock_data['Symbol']}")
 
-    time.sleep(0.2)  # ✅ Avoid rate limits
+    time.sleep(0.1)  # ✅ Avoid rate limits
 # Process Technology Cap Stocks
 for idx, row in df_technology.iterrows():
     stock_data = row.to_dict()
@@ -144,24 +151,58 @@ for idx, row in df_technology.iterrows():
         super_green_stocks.append(stock_data)
         print(f"🚀 Super Green Stock Identified: {stock_data['Symbol']}")
 
-    time.sleep(0.2)  # ✅ Avoid rate limits
+    time.sleep(0.1)  # ✅ Avoid rate limits
+# Process S&P Tracker Stocks
+
+
+for idx, row in df_sp_tracker.iterrows():
+    stock_data = row.to_dict()
+    stock_data["VWMA vs Current Price"] = stock_data["Current Price"] - stock_data["VWMA"]
+
+    print(f"🔍 Checking S&P Tracker: {stock_data['Symbol']}")
+
+    # **Criteria for S&P Tracker Stocks**
+    if (
+        stock_data["1 Month Price Change"] > 3
+        and stock_data["1 Week Price Change"] > 2
+        and 40 <= stock_data["RSI"] <= 70
+        and stock_data["Current Price"] > stock_data["VWMA"]
+        and stock_data["Sentiment Ratio"] > 0.6
+    ):
+        eligible_sp_tracker.append(stock_data)
+        print(f"✅ Momentum S&P Tracker Stock Identified: {stock_data['Symbol']}")
+
+    time.sleep(0.1)  # ✅ Avoid rate limits
 
 
 # 🔹 Merge the two lists for Hybrid stocks
-hybrid_stocks = eligible_large_cap + eligible_mid_cap + eligible_technology
+hybrid_stocks = eligible_large_cap + eligible_mid_cap + eligible_technology +eligible_sp_tracker
+
 
 # Convert to DataFrame
 df_hybrid = pd.DataFrame(hybrid_stocks)
 df_super_green = pd.DataFrame(super_green_stocks)
+# 🔹 Ensure all numerical values are JSON-compliant before updating Google Sheets
+df_hybrid.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
+df_super_green.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
 
-# Sort by Market Cap (optional)
-df_hybrid = df_hybrid.sort_values(by="Market Cap", ascending=False)
-df_super_green = df_super_green.sort_values(by="Market Cap", ascending=False)
+# 🔹 Convert all values to string to prevent JSON errors
+df_hybrid = df_hybrid.astype(str)
+df_super_green = df_super_green.astype(str)
 
-# Convert DataFrame to list of lists (for Google Sheets update)
+# 🔹 Validate & Remove any rows still containing "N/A" in numeric columns
+def is_valid_row(row):
+    return not any(val in ["N/A", "NaN", "inf", "-inf"] for val in row.values)
+
+df_hybrid = df_hybrid[df_hybrid.apply(is_valid_row, axis=1)]
+df_super_green = df_super_green[df_super_green.apply(is_valid_row, axis=1)]
+
+# Convert DataFrame to list of lists for Google Sheets update
+hybrid_data = [df_hybrid.columns.tolist()] + df_hybrid.values.tolist()
+super_green_data = [df_super_green.columns.tolist()] + df_super_green.values.tolist()
+
+# ✅ Clear and update Hybrid Sheet safely
 if not df_hybrid.empty:
-    hybrid_data = [df_hybrid.columns.tolist()] + df_hybrid.values.tolist()
-
     retry = True
     while retry:
         try:
@@ -172,7 +213,7 @@ if not df_hybrid.empty:
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
                 print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
-                time.sleep(60)  # ✅ Wait before retrying
+                time.sleep(10)
                 switch_api_key()
                 sheet = client.open("Stock Investment Analysis")
                 hybrid_ws = sheet.worksheet("Hybrid")
@@ -183,10 +224,8 @@ if not df_hybrid.empty:
 else:
     print(f"⚠️ No stocks met the criteria for Hybrid Sheet.")
 
-# 🔹 Update the "Super Green" Sheet
+# ✅ Clear and update Super Green Sheet safely
 if not df_super_green.empty:
-    super_green_data = [df_super_green.columns.tolist()] + df_super_green.values.tolist()
-
     retry = True
     while retry:
         try:
@@ -197,7 +236,62 @@ if not df_super_green.empty:
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
                 print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
-                time.sleep(10)  # ✅ Wait before retrying
+                time.sleep(10)
+                switch_api_key()
+                sheet = client.open("Stock Investment Analysis")
+                super_green_ws = sheet.worksheet("Super Green")
+            else:
+                print(f"❌ Error updating Super Green Sheet: {e}")
+                retry = False  
+
+# 🔹 Ensure data is JSON-compliant before updating Google Sheets
+df_hybrid.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
+df_super_green.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
+
+# Convert all values to string to avoid JSON errors
+df_hybrid = df_hybrid.astype(str)
+df_super_green = df_super_green.astype(str)
+
+# Convert DataFrame to list of lists for Google Sheets update
+hybrid_data = [df_hybrid.columns.tolist()] + df_hybrid.values.tolist()
+super_green_data = [df_super_green.columns.tolist()] + df_super_green.values.tolist()
+
+# ✅ Clear and update Hybrid Sheet
+if not df_hybrid.empty:
+    retry = True
+    while retry:
+        try:
+            hybrid_ws.clear()
+            hybrid_ws.update("A1", hybrid_data)
+            print(f"✅ Hybrid Stocks Identified & Updated in 'Hybrid' Sheet - {len(df_hybrid)} stocks")
+            retry = False  
+        except gspread.exceptions.APIError as e:
+            if "429" in str(e):
+                print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
+                time.sleep(10)
+                switch_api_key()
+                sheet = client.open("Stock Investment Analysis")
+                hybrid_ws = sheet.worksheet("Hybrid")
+            else:
+                print(f"❌ Error updating Hybrid Sheet: {e}")
+                retry = False  
+
+else:
+    print(f"⚠️ No stocks met the criteria for Hybrid Sheet.")
+
+# ✅ Clear and update Super Green Sheet
+if not df_super_green.empty:
+    retry = True
+    while retry:
+        try:
+            super_green_ws.clear()
+            super_green_ws.update("A1", super_green_data)
+            print(f"✅ Super Green Stocks Identified & Updated in 'Super Green' Sheet - {len(df_super_green)} stocks")
+            retry = False  
+        except gspread.exceptions.APIError as e:
+            if "429" in str(e):
+                print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
+                time.sleep(10)
                 switch_api_key()
                 sheet = client.open("Stock Investment Analysis")
                 super_green_ws = sheet.worksheet("Super Green")
