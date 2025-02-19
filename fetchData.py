@@ -189,40 +189,40 @@ for sheet_name, worksheet in sheets_to_update.items():
         # ✅ Fetch data in batch
         stock_data_batch = get_stock_data_batch(batch)
 
-        # ✅ Update Google Sheets
+        # ✅ Prepare batch update values
+        updates = []
+        timestamp_updates = []
+        
         for j, ticker in enumerate(batch, start=i + 2):  # Start from row 2
             if ticker in stock_data_batch:
                 stock_data = stock_data_batch[ticker]
+                fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                try:
-                    # ✅ Get current timestamp
-                    fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                # ✅ Append values for batch update
+                updates.append({"range": f"C{j}:J{j}", "values": [stock_data]})  # Stock data
+                timestamp_updates.append({"range": f"AG{j}", "values": [[fetch_datetime]]})  # Fetch time
+                
+                # ✅ Increment API call count
+                api_call_count += 1
 
-                    # ✅ Update Google Sheets without modifying columns L - AE
-                    update_range = f"C{j}:J{j}, AF{j}"  # Keeping L-AE intact, adding column AG
-                    values_to_update = [stock_data + [fetch_datetime]]  # Append fetch datetime
+        # ✅ Perform batch update for stock data
+        if updates:
+            try:
+                worksheet.batch_update(updates)
+                worksheet.batch_update(timestamp_updates)
+                print(f"✅ Updated {sheet_name} for batch {i + 1}-{i + batch_size}")
+            except gspread.exceptions.APIError as e:
+                if "429" in str(e):
+                    print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
+                    time.sleep(10)
+                    switch_api_key()
+                    worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
+                else:
+                    print(f"❌ Error updating {sheet_name}: {e}")
 
-                    worksheet.update(range_name=update_range, values=values_to_update)
-                    print(f"✅ Updated {sheet_name} - {ticker} in row {j} with fetch time {fetch_datetime}")
-
-                    # ✅ Increment API call count
-                    api_call_count += 1
-
-                    # ✅ Switch API keys every 20 calls
-                    if api_call_count % 20 == 0:
-                        print(f"🔄 Switching API key after 20 calls... {api_call_count}")
-                        switch_api_key()
-
-                except gspread.exceptions.APIError as e:
-                    if "429" in str(e):
-                        print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
-                        time.sleep(10)
-                        switch_api_key()
-                        worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
-                    else:
-                        print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
-                        break  
+        # ✅ Switch API keys every 20 calls
+        if api_call_count % 20 == 0:
+            print(f"🔄 Switching API key after 20 calls... {api_call_count}")
+            switch_api_key()
 
 print("✅ Google Sheets 'Large Cap', 'Mid Cap', 'Technology' & 'SP Tracker' updated!")
-
-
