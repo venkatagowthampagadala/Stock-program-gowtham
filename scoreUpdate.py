@@ -26,19 +26,19 @@ active_api = 1  # Track which API key is being used
 # Open the spreadsheet and access both Large Cap & Mid Cap sheets
 sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
+    "SP Tracker":sheet.worksheet("SP Tracker"),
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
     "Technology":sheet.worksheet("Technology"),
-    "SP Tracker":sheet.worksheet("SP Tracker")
+    
 }
 
 # 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
     active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
+    client = authorize_client(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
-
 
 # Weight assignments for scoring
 WEIGHTS = {
@@ -171,6 +171,6 @@ for sheet_name, worksheet in sheets_to_update.items():
                     print(f"❌ Error batch updating {sheet_name} rows {row_numbers}: {e}")
                     retry = False
 
-        time.sleep(0.2)  # Small delay to prevent hitting API limits
+        time.sleep(1)  # Small delay to prevent hitting API limits
 
 print("✅ Scores updated in batches of 10 & Colors applied to Column A for both Large Cap & Mid Cap!")
