@@ -199,7 +199,7 @@ for sheet_name, worksheet in sheets_to_update.items():
                     fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                     # ✅ Update Google Sheets without modifying columns L - AE
-                    update_range = f"C{j}:J{j}, AG{j}"  # Keeping L-AE intact, adding column AG
+                    update_range = f"C{j}:J{j}, AF{j}"  # Keeping L-AE intact, adding column AG
                     values_to_update = [stock_data + [fetch_datetime]]  # Append fetch datetime
 
                     worksheet.update(range_name=update_range, values=values_to_update)
