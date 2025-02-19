@@ -194,10 +194,20 @@ df_super_green = pd.DataFrame(super_green_stocks)
 df_hybrid = df_hybrid.sort_values(by="Market Cap", ascending=False)
 df_super_green = df_super_green.sort_values(by="Market Cap", ascending=False)
 
-# Convert DataFrame to list of lists (for Google Sheets update)
-if not df_hybrid.empty:
-    hybrid_data = [df_hybrid.columns.tolist()] + df_hybrid.values.tolist()
+# 🔹 Ensure data is JSON-compliant before updating Google Sheets
+df_hybrid.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
+df_super_green.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
 
+# Convert all values to string to avoid JSON errors
+df_hybrid = df_hybrid.astype(str)
+df_super_green = df_super_green.astype(str)
+
+# Convert DataFrame to list of lists for Google Sheets update
+hybrid_data = [df_hybrid.columns.tolist()] + df_hybrid.values.tolist()
+super_green_data = [df_super_green.columns.tolist()] + df_super_green.values.tolist()
+
+# ✅ Clear and update Hybrid Sheet
+if not df_hybrid.empty:
     retry = True
     while retry:
         try:
@@ -208,7 +218,7 @@ if not df_hybrid.empty:
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
                 print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
-                time.sleep(60)  # ✅ Wait before retrying
+                time.sleep(60)
                 switch_api_key()
                 sheet = client.open("Stock Investment Analysis")
                 hybrid_ws = sheet.worksheet("Hybrid")
@@ -219,10 +229,8 @@ if not df_hybrid.empty:
 else:
     print(f"⚠️ No stocks met the criteria for Hybrid Sheet.")
 
-# 🔹 Update the "Super Green" Sheet
+# ✅ Clear and update Super Green Sheet
 if not df_super_green.empty:
-    super_green_data = [df_super_green.columns.tolist()] + df_super_green.values.tolist()
-
     retry = True
     while retry:
         try:
@@ -233,7 +241,7 @@ if not df_super_green.empty:
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
                 print(f"⚠️ Rate limit hit! Pausing for 60 seconds before switching API keys...")
-                time.sleep(10)  # ✅ Wait before retrying
+                time.sleep(10)
                 switch_api_key()
                 sheet = client.open("Stock Investment Analysis")
                 super_green_ws = sheet.worksheet("Super Green")
