@@ -12,7 +12,7 @@ SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 # 🔹 Load credentials from GitHub Secrets
 CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
 CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
-CREDS_JSON_3 = os.getenv("GOOGLE_CREDENTIALS_3")
+
 # Function to authorize with a given key
 def authorize_client(creds_json):
     creds_dict = json.loads(creds_json)
@@ -35,17 +35,10 @@ sheets_to_update = {
 # 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
-    if active_api == 1:
-        active_api = 2
-        client = authorize_client(CREDS_JSON_2)
-    elif active_api == 2:
-        active_api = 3
-        client = authorize_client(CREDS_JSON_3)
-    else:
-        active_api = 1  # Loop back to first key after third key
-        client = authorize_client(CREDS_JSON_1)
-
+    active_api = 2 if active_api == 1 else 1  # Toggle API key
+    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
+
 
 # Weight assignments for scoring
 WEIGHTS = {
