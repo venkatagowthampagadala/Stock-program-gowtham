@@ -264,28 +264,29 @@ for sheet_name, worksheet in sheets_to_update.items():
             if ticker in stock_data_batch:
                 stock_data = stock_data_batch[ticker]
 
-                # ✅ Update Google Sheets
-                worksheet.update(range_name=f"C{j}:J{j}", values=[stock_data])
-                print(f"✅ Updated {sheet_name} - {ticker} in row {j}")
+                try:
+                    # ✅ Update Google Sheets
+                    worksheet.update(range_name=f"C{j}:N{j}", values=[stock_data])
+                    print(f"✅ Updated {sheet_name} - {ticker} in row {j}")
 
-                # ✅ Increment API call count
-                api_call_count += 1
+                    # ✅ Increment API call count
+                    api_call_count += 1
 
-                # ✅ Switch API keys every 20 calls
-                if api_call_count % 20 == 0:
-                    print(f"🔄 Switching API key after 20 calls... {api_call_count}")
-                    switch_api_key()
-                    break
-        time.sleep(1)  # ✅ Prevent hitting rate limits
-            except gspread.exceptions.APIError as e:
-                if "429" in str(e):
-                    print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
-                    time.sleep(10)  
-                    switch_api_key()
-                    worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
-                else:
-                    print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
-                    break  
+                    # ✅ Switch API keys every 20 calls
+                    if api_call_count % 20 == 0:
+                        print(f"🔄 Switching API key after 20 calls... {api_call_count}")
+                        switch_api_key()
 
-print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated!")
+                except gspread.exceptions.APIError as e:
+                    if "429" in str(e):
+                        print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
+                        time.sleep(10)
+                        switch_api_key()
+                        worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
+                    else:
+                        print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
+                        break  
+
+print("✅ Google Sheets 'Large Cap', 'Mid Cap', 'Technology' & 'SP Tracker' updated!")
+
 
