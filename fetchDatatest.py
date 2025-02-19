@@ -205,30 +205,31 @@ for sheet_name, worksheet in sheets_to_update.items():
 
                 # ✅ Append values for batch update
                 updates.append({"range": f"C{j}:N{j}", "values": [stock_data]})  # Stock data (12 columns)
-                timestamp_updates.append({"range": f"AG{j}", "values": [[fetch_datetime]]})  # Fetch time
+                timestamp_updates.append({"range": f"AF{j}", "values": [[fetch_datetime]]})  # Fetch time
                 
                 # ✅ Increment API call count
                 api_call_count += 1
 
         # ✅ Perform batch update for stock data with **infinite retry on 429 error**
         retry_attempts = 0
-        while retry_attempts < 5:  # Set an upper limit on retries (Optional)
+        while retry_attempts < 5:  # Retry up to 5 times
             try:
                 if updates:
-                    worksheet.batch_update(updates)
-                    worksheet.batch_update(timestamp_updates)
+                    worksheet.batch_update(updates)  # ✅ Attempt batch update
+                    worksheet.batch_update(timestamp_updates)  # ✅ Update timestamps
                     print(f"✅ Updated {sheet_name} for batch {i + 1}-{i + batch_size}")
                 break  # ✅ Exit retry loop if successful
-
+        
             except gspread.exceptions.APIError as e:
-                if "429" in str(e):
+                if "429" in str(e):  # ✅ Rate limit error
                     retry_attempts += 1
                     print(f"⚠️ Rate limit hit! Retrying in 10 seconds (Attempt {retry_attempts})...")
-                    time.sleep(10)  # ✅ Wait for 10 seconds before retrying
+                    time.sleep(10)  # ✅ Wait 10 seconds before retrying
                     switch_api_key()  # ✅ Switch API key if necessary
                     worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
+        
                 else:
-                    print(f"❌ Error updating {sheet_name}: {e}")
+                    print(f"❌ Error updating {sheet_name}: {e}")  # ❌ Handle other errors immediately
                     break  # ❌ Exit loop for non-429 errors
 
         # ✅ Switch API keys every 20 calls
