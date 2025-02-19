@@ -176,6 +176,7 @@ def get_stock_data_batch(ticker_list, max_retries=3):
     return {}
 
 # 🔹 Process each ticker row-by-row
+
 api_call_count = 0  # Track number of API calls
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
@@ -197,32 +198,38 @@ for sheet_name, worksheet in sheets_to_update.items():
                 stock_data = stock_data_batch[ticker]
                 fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                # ✅ Ensure stock_data matches the expected number of columns (C:J → 8 columns)
+                # ✅ Ensure stock_data matches the expected number of columns (C:N → 12 columns)
                 if len(stock_data) != 12:
-                    print(f"⚠️ Data length mismatch for {ticker}. Expected 8 columns, got {len(stock_data)}. Skipping...")
+                    print(f"⚠️ Data length mismatch for {ticker}. Expected 12 columns, got {len(stock_data)}. Skipping...")
                     continue
 
                 # ✅ Append values for batch update
-                updates.append({"range": f"C{j}:N{j}", "values": [stock_data]})  # Stock data (8 columns)
+                updates.append({"range": f"C{j}:N{j}", "values": [stock_data]})  # Stock data (12 columns)
                 timestamp_updates.append({"range": f"AG{j}", "values": [[fetch_datetime]]})  # Fetch time
                 
                 # ✅ Increment API call count
                 api_call_count += 1
 
-        # ✅ Perform batch update for stock data
-        if updates:
+        # ✅ Perform batch update for stock data with **infinite retry on 429 error**
+        retry_attempts = 0
+        while retry_attempts < 5:  # Set an upper limit on retries (Optional)
             try:
-                worksheet.batch_update(updates)
-                worksheet.batch_update(timestamp_updates)
-                print(f"✅ Updated {sheet_name} for batch {i + 1}-{i + batch_size}")
+                if updates:
+                    worksheet.batch_update(updates)
+                    worksheet.batch_update(timestamp_updates)
+                    print(f"✅ Updated {sheet_name} for batch {i + 1}-{i + batch_size}")
+                break  # ✅ Exit retry loop if successful
+
             except gspread.exceptions.APIError as e:
                 if "429" in str(e):
-                    print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
-                    time.sleep(10)
-                    switch_api_key()
+                    retry_attempts += 1
+                    print(f"⚠️ Rate limit hit! Retrying in 10 seconds (Attempt {retry_attempts})...")
+                    time.sleep(10)  # ✅ Wait for 10 seconds before retrying
+                    switch_api_key()  # ✅ Switch API key if necessary
                     worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
                 else:
                     print(f"❌ Error updating {sheet_name}: {e}")
+                    break  # ❌ Exit loop for non-429 errors
 
         # ✅ Switch API keys every 20 calls
         if api_call_count % 20 == 0:
