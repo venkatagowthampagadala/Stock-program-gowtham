@@ -6,6 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import time
 import pandas as pd
 import numpy as np
+from datetime import datetime  
 
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -265,9 +266,15 @@ for sheet_name, worksheet in sheets_to_update.items():
                 stock_data = stock_data_batch[ticker]
 
                 try:
-                    # ✅ Update Google Sheets
-                    worksheet.update(range_name=f"C{j}:N{j}", values=[stock_data])
-                    print(f"✅ Updated {sheet_name} - {ticker} in row {j}")
+                    # ✅ Get current timestamp
+                    fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                    # ✅ Update Google Sheets without modifying columns L - AE
+                    update_range = f"C{j}:J{j}, AG{j}"  # Keeping L-AE intact, adding column AG
+                    values_to_update = [stock_data + [fetch_datetime]]  # Append fetch datetime
+
+                    worksheet.update(range_name=update_range, values=values_to_update)
+                    print(f"✅ Updated {sheet_name} - {ticker} in row {j} with fetch time {fetch_datetime}")
 
                     # ✅ Increment API call count
                     api_call_count += 1
