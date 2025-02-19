@@ -162,6 +162,88 @@ def get_stock_data(ticker, max_retries=3):
 
     print(f"❌ Skipping {ticker} after {max_retries} failed attempts due to YFinance rate limits.")
     return None  # Skip stock if all retries fail
+def get_stock_data_batch(ticker_list, max_retries=3):
+    retries = 0
+    while retries < max_retries:
+        try:
+            # ✅ Fetch data for multiple tickers at once
+            tickers = yf.Tickers(ticker_list)
+            data = {}
+
+            for ticker in ticker_list:
+                stock = tickers.tickers.get(ticker)
+                if stock is None:
+                    print(f"⚠️ No data found for {ticker}")
+                    continue
+                
+                hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
+                if hist.empty:
+                    print(f"⚠️ No historical data for {ticker}")
+                    continue
+
+                # Extract Close prices and Volumes
+                prices = hist["Close"]
+                volumes = hist["Volume"]
+    
+                # Market Cap and P/E Ratio
+                market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
+                pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
+    
+                # Current Price (latest available close price)
+                current_price = safe_convert(prices.iloc[-1])
+    
+                # Yesterday's Close Price
+                yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
+                # Check if current_price is zero or N/A and assign yesterday_close_price
+                if current_price == 0 or current_price == "N/A":
+                    current_price = yesterday_close_price
+                    print(f"🔄 Current price for {ticker} set to yesterday's close: {current_price}")
+    
+                # 1-Day Price Change
+                percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
+    
+                # 1-Week and 1-Month Price Changes
+                one_week_ago_price = safe_convert(prices.iloc[-6]) if len(prices) > 6 else "N/A"
+                one_month_ago_price = safe_convert(prices.iloc[0])
+                percent_change_1wk = round(((current_price - one_week_ago_price) / one_week_ago_price) * 100, 2) if one_week_ago_price != "N/A" else "N/A"
+                percent_change_1mo = round(((current_price - one_month_ago_price) / one_month_ago_price) * 100, 2)
+    
+                # Volume
+                volume = safe_convert(volumes.iloc[-1])
+    
+                # RSI (14-day)
+                rsi = calculate_rsi(prices, period=14)
+    
+                # VWMA (20-day)
+                vwma = calculate_vwma(prices, volumes, period=20)
+    
+                # EMA (10-day)
+                ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
+    
+                # ATR (14-day)
+                atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
+
+                # Store fetched data
+                data[ticker] = [
+                market_cap, pe_ratio, current_price, yesterday_close_price,
+                format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
+                volume, rsi, vwma, ema, atr
+                ]
+
+            return data
+
+        except Exception as e:
+            error_msg = str(e)
+            if "Too Many Requests" in error_msg:
+                print(f"⚠️ YFinance Rate Limit hit. Pausing for 60 seconds...")
+                time.sleep(60)  # ✅ Pause for 60 seconds before retrying
+                retries += 1
+            else:
+                print(f"❌ Error fetching batch data: {e}")
+                return {}
+
+    print(f"❌ Skipping batch after {max_retries} failed attempts due to YFinance rate limits.")
+    return {}
 
 # 🔹 Process each ticker row-by-row
 api_call_count = 0  # Track number of API calls
@@ -169,31 +251,32 @@ api_call_count = 0  # Track number of API calls
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
 
-    for idx, ticker in enumerate(tickers, start=2):  # Start from row 2
-        while True:
-            try:
-                stock_data = get_stock_data(ticker)
-                if stock_data is None:
-                    print(f"⚠️ Skipping update for {ticker}: No data available.")
-                    break  
+    # ✅ Process tickers in batches of 10
+    batch_size = 10
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
 
-                # Convert to valid types for Google Sheets
-                stock_data = [safe_convert(val) for val in stock_data]
+        # ✅ Fetch data in batch
+        stock_data_batch = get_stock_data_batch(batch)
 
-                # Update Google Sheet (Row-by-Row)
-                worksheet.update(range_name=f"C{idx}:N{idx}", values=[stock_data])
-                print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
+        # ✅ Update Google Sheets
+        for j, ticker in enumerate(batch, start=i + 2):  # Start from row 2
+            if ticker in stock_data_batch:
+                stock_data = stock_data_batch[ticker]
+
+                # ✅ Update Google Sheets
+                worksheet.update(range_name=f"C{j}:J{j}", values=[stock_data])
+                print(f"✅ Updated {sheet_name} - {ticker} in row {j}")
 
                 # ✅ Increment API call count
                 api_call_count += 1
 
                 # ✅ Switch API keys every 20 calls
-                if api_call_count % 15 == 0:
-                    print(f"🔄 Switching API key after 20 calls...  {api_call_count}")
+                if api_call_count % 20 == 0:
+                    print(f"🔄 Switching API key after 20 calls... {api_call_count}")
                     switch_api_key()
-
-                break  
-
+                    break
+        time.sleep(1)  # ✅ Prevent hitting rate limits
             except gspread.exceptions.APIError as e:
                 if "429" in str(e):
                     print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
