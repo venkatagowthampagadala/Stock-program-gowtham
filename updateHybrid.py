@@ -11,7 +11,6 @@ SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 # 🔹 Load credentials from GitHub Secrets
 CREDS_JSON_1 = os.getenv("GOOGLE_CREDENTIALS_1")
 CREDS_JSON_2 = os.getenv("GOOGLE_CREDENTIALS_2")
-CREDS_JSON_3 = os.getenv("GOOGLE_CREDENTIALS_3")
 
 # 🔹 Function to authenticate with Google Sheets using JSON from environment variables
 def authenticate_with_json(json_str):
@@ -35,16 +34,8 @@ super_green_ws = sheet.worksheet("Super Green")  # ✅ Super Green Sheet
 # 🔹 Function to switch API keys when hitting rate limits
 def switch_api_key():
     global active_api, client
-    if active_api == 1:
-        active_api = 2
-        client = authenticate_with_json(CREDS_JSON_2)
-    elif active_api == 2:
-        active_api = 3
-        client = authenticate_with_json(CREDS_JSON_3)
-    else:
-        active_api = 1  # Loop back to first key after third key
-        client = authenticate_with_json(CREDS_JSON_1)
-
+    active_api = 2 if active_api == 1 else 1  # Toggle API key
+    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
 
 # Fetch data from Large Cap & Mid Cap sheets
@@ -186,13 +177,7 @@ for idx, row in df_sp_tracker.iterrows():
 # 🔹 Merge the two lists for Hybrid stocks
 hybrid_stocks = eligible_large_cap + eligible_mid_cap + eligible_technology +eligible_sp_tracker
 
-# Convert to DataFrame
-df_hybrid = pd.DataFrame(hybrid_stocks)
-df_super_green = pd.DataFrame(super_green_stocks)
 
-# Sort by Market Cap (optional)
-df_hybrid = df_hybrid.sort_values(by="Market Cap", ascending=False)
-df_super_green = df_super_green.sort_values(by="Market Cap", ascending=False)
 
 # 🔹 Ensure data is JSON-compliant before updating Google Sheets
 df_hybrid.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
