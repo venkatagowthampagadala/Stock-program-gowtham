@@ -198,12 +198,12 @@ for sheet_name, worksheet in sheets_to_update.items():
                 fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 # ✅ Ensure stock_data matches the expected number of columns (C:J → 8 columns)
-                if len(stock_data) != 8:
+                if len(stock_data) != 12:
                     print(f"⚠️ Data length mismatch for {ticker}. Expected 8 columns, got {len(stock_data)}. Skipping...")
                     continue
 
                 # ✅ Append values for batch update
-                updates.append({"range": f"C{j}:J{j}", "values": [stock_data]})  # Stock data (8 columns)
+                updates.append({"range": f"C{j}:N{j}", "values": [stock_data]})  # Stock data (8 columns)
                 timestamp_updates.append({"range": f"AG{j}", "values": [[fetch_datetime]]})  # Fetch time
                 
                 # ✅ Increment API call count
