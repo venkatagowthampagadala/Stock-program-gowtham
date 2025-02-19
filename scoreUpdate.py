@@ -37,13 +37,13 @@ def switch_api_key():
     global active_api, client
     if active_api == 1:
         active_api = 2
-        client = authenticate_with_json(CREDS_JSON_2)
+        client = authorize_client(CREDS_JSON_2)
     elif active_api == 2:
         active_api = 3
-        client = authenticate_with_json(CREDS_JSON_3)
+        client = authorize_client(CREDS_JSON_3)
     else:
         active_api = 1  # Loop back to first key after third key
-        client = authenticate_with_json(CREDS_JSON_1)
+        client = authorize_client(CREDS_JSON_1)
 
     print(f"🔄 Switched to API Key {active_api}")
 
