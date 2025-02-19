@@ -26,7 +26,7 @@ active_api = 1  # Track which API key is being used
 # Open the main spreadsheet and access sheets
 sheet = client.open("Stock Investment Analysis")
 large_cap_ws = sheet.worksheet("Large Cap")
-sp_tracker_ws = sheet.worksheet("S&P Tracker")
+sp_tracker_ws = sheet.worksheet("SP Tracker")
 mid_cap_ws = sheet.worksheet("Mid Cap")
 hybrid_ws = sheet.worksheet("Hybrid")
 technology_ws = sheet.worksheet("Technology") 
