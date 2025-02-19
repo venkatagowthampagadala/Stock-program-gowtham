@@ -177,7 +177,6 @@ def get_stock_data_batch(ticker_list, max_retries=3):
 
 # 🔹 Process each ticker row-by-row
 api_call_count = 0  # Track number of API calls
-
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
 
@@ -198,8 +197,13 @@ for sheet_name, worksheet in sheets_to_update.items():
                 stock_data = stock_data_batch[ticker]
                 fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+                # ✅ Ensure stock_data matches the expected number of columns (C:J → 8 columns)
+                if len(stock_data) != 8:
+                    print(f"⚠️ Data length mismatch for {ticker}. Expected 8 columns, got {len(stock_data)}. Skipping...")
+                    continue
+
                 # ✅ Append values for batch update
-                updates.append({"range": f"C{j}:J{j}", "values": [stock_data]})  # Stock data
+                updates.append({"range": f"C{j}:J{j}", "values": [stock_data]})  # Stock data (8 columns)
                 timestamp_updates.append({"range": f"AG{j}", "values": [[fetch_datetime]]})  # Fetch time
                 
                 # ✅ Increment API call count
