@@ -178,6 +178,9 @@ for idx, row in df_sp_tracker.iterrows():
 # 🔹 Merge the two lists for Hybrid stocks
 
 hybrid_stocks = eligible_large_cap + eligible_mid_cap + eligible_technology +eligible_sp_tracker
+df_hybrid = pd.DataFrame(hybrid_stocks)
+df_super_green = pd.DataFrame(super_green_stocks)
+
 # 🔹 Ensure data is JSON-compliant before updating Google Sheets
 df_hybrid.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
 df_super_green.replace([np.inf, -np.inf, np.nan], "N/A", inplace=True)
