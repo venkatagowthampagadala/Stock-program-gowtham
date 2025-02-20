@@ -210,7 +210,7 @@ for sheet_name, worksheet in sheets_to_update.items():
     
                 # ✅ Append values for batch update
                 updates.append({"range": f"C{j}:N{j}", "values": [stock_data]})  # Stock data (12 columns)
-                timestamp_updates.append({"range": f"{timestamp_column}{j}", "values": [[fetch_datetime]]})  # Fetch time
+                timestamp_updates.append({"range": f"AF{j}", "values": [[fetch_datetime]]})  # Fetch time
     
         # ✅ Retry batch updates 5 times before skipping
         retry_attempts = 0
