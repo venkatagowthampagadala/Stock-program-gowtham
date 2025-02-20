@@ -25,5 +25,5 @@ jobs:
         env:
           GOOGLE_CREDENTIALS_1: ${{ secrets.GOOGLE_CREDENTIALS_1 }}
           GOOGLE_CREDENTIALS_2: ${{ secrets.GOOGLE_CREDENTIALS_2 }}
-        run: python fetchDatatest.py
+        run: python fetchData.py
 
