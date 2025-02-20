@@ -180,15 +180,25 @@ def get_stock_data_batch(ticker_list, max_retries=3):
 api_call_count = 0  # Track number of API calls
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
-
-    # ✅ Process tickers in batches of 10
-    batch_size = 10
+    # ✅ Process tickers in smaller batches to avoid YFinance rate limits
+    batch_size = 5  # Reduce batch size to avoid limits
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i:i + batch_size]
-
-        # ✅ Fetch data in batch
-        stock_data_batch = get_stock_data_batch(batch)
-
+    
+        retry_attempts = 0
+        while retry_attempts < 3:  # Retry up to 3 times if rate limit is hit
+            try:
+                stock_data_batch = get_stock_data_batch(batch)
+                break  # ✅ Exit retry loop if successful
+            except Exception as e:
+                if "Too Many Requests" in str(e):
+                    retry_attempts += 1
+                    print(f"⚠️ YFinance Rate Limit hit! Retrying in 60 seconds... (Attempt {retry_attempts})")
+                    time.sleep(60)  # ✅ Wait before retrying
+                else:
+                    print(f"❌ Error fetching data: {e}")
+                    break  # Exit loop for non-rate-limit errors
+    
         # ✅ Prepare batch update values
         updates = []
         timestamp_updates = []
@@ -197,41 +207,33 @@ for sheet_name, worksheet in sheets_to_update.items():
             if ticker in stock_data_batch:
                 stock_data = stock_data_batch[ticker]
                 fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-                # ✅ Ensure stock_data matches the expected number of columns (C:N → 12 columns)
-                if len(stock_data) != 12:
-                    print(f"⚠️ Data length mismatch for {ticker}. Expected 12 columns, got {len(stock_data)}. Skipping...")
-                    continue
-
+    
                 # ✅ Append values for batch update
                 updates.append({"range": f"C{j}:N{j}", "values": [stock_data]})  # Stock data (12 columns)
-                timestamp_updates.append({"range": f"AF{j}", "values": [[fetch_datetime]]})  # Fetch time
-                
-                # ✅ Increment API call count
-                api_call_count += 1
-
-        # ✅ Perform batch update for stock data with **infinite retry on 429 error**
+                timestamp_updates.append({"range": f"{timestamp_column}{j}", "values": [[fetch_datetime]]})  # Fetch time
+    
+        # ✅ Retry batch updates 5 times before skipping
         retry_attempts = 0
-        while retry_attempts < 5:  # Retry up to 5 times
+        while retry_attempts < 5:
             try:
                 if updates:
-                    worksheet.batch_update(updates)  # ✅ Attempt batch update
-                    worksheet.batch_update(timestamp_updates)  # ✅ Update timestamps
+                    worksheet.batch_update(updates)
+                    worksheet.batch_update(timestamp_updates)
                     print(f"✅ Updated {sheet_name} for batch {i + 1}-{i + batch_size}")
                 break  # ✅ Exit retry loop if successful
-        
             except gspread.exceptions.APIError as e:
-                if "429" in str(e):  # ✅ Rate limit error
+                if "429" in str(e):
                     retry_attempts += 1
                     print(f"⚠️ Rate limit hit! Retrying in 10 seconds (Attempt {retry_attempts})...")
-                    time.sleep(10)  # ✅ Wait 10 seconds before retrying
-                    switch_api_key()  # ✅ Switch API key if necessary
+                    time.sleep(10)  # ✅ Wait before retrying
+                    switch_api_key()
                     worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
-        
                 else:
-                    print(f"❌ Error updating {sheet_name}: {e}")  # ❌ Handle other errors immediately
-                    break  # ❌ Exit loop for non-429 errors
-
+                    print(f"❌ Error updating {sheet_name}: {e}")
+                    break  # Exit loop for non-429 errors
+    
+        # ✅ Add a delay between batch processing
+        time.sleep(1)  # ✅ Wait 2 seconds before next batch
         # ✅ Switch API keys every 20 calls
         if api_call_count % 20 == 0:
             print(f"🔄 Switching API key after 20 calls... {api_call_count}")
