@@ -56,9 +56,8 @@ updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] f
 # ✅ Update Google Sheets with the existing data structure
 top_picks_ws.clear()
 top_picks_ws.update("A1", updated_data)
-
 def get_earnings_data(ticker, max_retries=3):
-    """Fetch earnings data from Yahoo Finance with updated API handling."""
+    """Fetch earnings data from Yahoo Finance and handle missing attributes properly."""
     retries = 0
     while retries < max_retries:
         try:
@@ -68,35 +67,26 @@ def get_earnings_data(ticker, max_retries=3):
     
             # ✅ Print full JSON response in a readable format
             print(json.dumps(stock_data, indent=4))  # Pretty print the full response
-            # ✅ Fetch earnings date from calendar safely
+            # ✅ Extract earnings-related data
             earnings_date = "N/A"
-            try:
-                if "Earnings Date" in stock.calendar.index:
-                    earnings_date = stock.calendar.loc["Earnings Date"].strftime("%Y-%m-%d")
-            except Exception:
-                earnings_date = "N/A"
+            if "earningsTimestampStart" in stock.info and "earningsTimestampEnd" in stock.info:
+                earnings_date = datetime.utcfromtimestamp(stock.info["earningsTimestampStart"]).strftime("%Y-%m-%d")
 
-            # ✅ Fetch key financial metrics safely
-            eps = stock.info.get("trailingEps", "N/A")
-            revenue_growth = stock.info.get("revenueGrowth", "N/A")
-            debt_to_equity = stock.info.get("debtToEquity", "N/A")
-
-            # ✅ Fetch earnings surprise from income statement (Alternative to `stock.earnings`)
-            earnings_surprise = "N/A"
-            try:
-                income_stmt = stock.income_stmt
-                if "Net Income" in income_stmt.index and len(income_stmt.columns) > 0:
-                    earnings_surprise = round(income_stmt.iloc[-1].sum(), 2)  # Fetch most recent net income
-            except Exception:
-                earnings_surprise = "N/A"
+            # ✅ Extract financial metrics
+            eps = stock.info.get("trailingEps", "N/A")  # EPS (Earnings Per Share)
+            revenue_growth = stock.info.get("revenueGrowth", "N/A")  # Revenue Growth %
+            debt_to_equity = stock.info.get("debtToEquity", "N/A")  # Debt-to-Equity Ratio
+            
+            # ✅ Extract earnings surprise (Since `earnings` is deprecated, use `netIncomeToCommon`)
+            earnings_surprise = stock.info.get("netIncomeToCommon", "N/A")
 
             return earnings_date, eps, revenue_growth, debt_to_equity, earnings_surprise
 
         except Exception as e:
             error_msg = str(e)
             if "Too Many Requests" in error_msg:
-                print(f"⚠️ YFinance Rate Limit hit for {ticker}. Retrying in 30 seconds...")
-                time.sleep(30)  # ✅ Shorter wait to reduce downtime
+                print(f"⚠️ YFinance Rate Limit hit for {ticker}. Pausing for 60 seconds...")
+                time.sleep(60)  # ✅ Pause for 60 seconds before retrying
                 retries += 1
             else:
                 print(f"❌ Error fetching earnings data for {ticker}: {e}")
