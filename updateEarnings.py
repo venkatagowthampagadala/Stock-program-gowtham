@@ -64,23 +64,31 @@ def get_earnings_data(ticker, max_retries=3):
             stock = yf.Ticker(ticker)
             stock_info = stock.info  # Fetch full stock info
 
-            # ✅ Fetch earnings-related data
-            if "earningsTimestampStart" in stock.info and "earningsTimestampEnd" in stock.info:
-                earnings_date = datetime.utcfromtimestamp(stock.info["earningsTimestampStart"]).strftime("%Y-%m-%d")
+            # ✅ Fetch Earnings Date safely
+            earnings_date = "N/A"
+            if stock_info.get("earningsTimestampStart"):
+                earnings_date = datetime.utcfromtimestamp(stock_info["earningsTimestampStart"]).strftime("%Y-%m-%d")
 
+            # ✅ Fetch Key Financial Data
             eps_actual = stock_info.get("trailingEps", "N/A")  # Reported EPS
             eps_estimate = stock_info.get("epsForward", "N/A")  # Expected EPS
             revenue_growth = stock_info.get("revenueGrowth", "N/A")  # Revenue Growth %
             debt_to_equity = stock_info.get("debtToEquity", "N/A")  # Debt-to-Equity Ratio
 
+            # ✅ Ensure numerical values are valid
+            eps_actual = float(eps_actual) if isinstance(eps_actual, (int, float)) else "N/A"
+            eps_estimate = float(eps_estimate) if isinstance(eps_estimate, (int, float)) else "N/A"
+            revenue_growth = float(revenue_growth) if isinstance(revenue_growth, (int, float)) else "N/A"
+            debt_to_equity = float(debt_to_equity) if isinstance(debt_to_equity, (int, float)) else "N/A"
+
             # ✅ Calculate Earnings Surprise
             earnings_surprise = "N/A"
-             # ✅ Validate EPS Estimate before Calculation
             if eps_actual != "N/A" and eps_estimate != "N/A" and eps_estimate > 0:
                 earnings_surprise = round(((eps_actual - eps_estimate) / eps_estimate) * 100, 2)
             else:
                 # ⚠️ If `epsForward` is missing, use `earningsQuarterlyGrowth` instead.
                 earnings_surprise = stock_info.get("earningsQuarterlyGrowth", "N/A")
+                earnings_surprise = round(float(earnings_surprise) * 100, 2) if isinstance(earnings_surprise, (int, float)) else "N/A"
 
             return earnings_date, eps_actual, revenue_growth, debt_to_equity, earnings_surprise
 
