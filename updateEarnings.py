@@ -65,7 +65,9 @@ def get_earnings_data(ticker, max_retries=3):
             stock_info = stock.info  # Fetch full stock info
 
             # ✅ Fetch earnings-related data
-            earnings_date = stock_info.get("earningsTimestampStart", "N/A")
+            if "earningsTimestampStart" in stock.info and "earningsTimestampEnd" in stock.info:
+                earnings_date = datetime.utcfromtimestamp(stock.info["earningsTimestampStart"]).strftime("%Y-%m-%d")
+
             eps_actual = stock_info.get("trailingEps", "N/A")  # Reported EPS
             eps_estimate = stock_info.get("epsForward", "N/A")  # Expected EPS
             revenue_growth = stock_info.get("revenueGrowth", "N/A")  # Revenue Growth %
