@@ -57,9 +57,8 @@ updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] f
 top_picks_ws.clear()
 top_picks_ws.update("A1", updated_data)
 
-# ✅ Function to fetch earnings data using Yahoo Finance
 def get_earnings_data(ticker, max_retries=3):
-    """Fetch earnings data from Yahoo Finance."""
+    """Fetch earnings data from Yahoo Finance, avoiding missing attributes."""
     retries = 0
     while retries < max_retries:
         try:
@@ -67,20 +66,26 @@ def get_earnings_data(ticker, max_retries=3):
 
             # ✅ Fetch earnings calendar data
             earnings_calendar = stock.calendar
-            earnings_date = earnings_calendar.get("Earnings Date", ["N/A"])[0]
+            earnings_date = earnings_calendar.get("Earnings Date", ["N/A"])
+            if isinstance(earnings_date, list) and earnings_date:
+                earnings_date = earnings_date[0]  # Extract the date from list if available
+            else:
+                earnings_date = "N/A"
 
             # ✅ Fetch key financial metrics
-            financials = stock.financials
-            eps = financials.get("Diluted EPS", {}).get(0, "N/A")  # EPS
+            eps = stock.info.get("trailingEps", "N/A")  # EPS (Trailing)
             revenue_growth = stock.info.get("revenueGrowth", "N/A")  # Revenue Growth
             debt_to_equity = stock.info.get("debtToEquity", "N/A")  # Debt-to-Equity Ratio
 
-            # ✅ Fetch earnings surprise (if available)
+            # ✅ Fetch earnings surprise manually from earnings data
             earnings_surprise = "N/A"
-            if "Earnings History" in stock.analysis:
-                earnings_history = stock.analysis["Earnings History"]
-                if earnings_history:
-                    earnings_surprise = earnings_history.iloc[0]["Surprise(%)"]
+            try:
+                earnings_df = stock.earnings
+                if not earnings_df.empty:
+                    last_quarter = earnings_df.iloc[-1]
+                    earnings_surprise = round(last_quarter["Earnings"], 2)
+            except Exception:
+                earnings_surprise = "N/A"
 
             return earnings_date, eps, revenue_growth, debt_to_equity, earnings_surprise
 
@@ -96,6 +101,7 @@ def get_earnings_data(ticker, max_retries=3):
 
     print(f"❌ Skipping {ticker} after {max_retries} failed attempts due to YFinance rate limits.")
     return "N/A", "N/A", "N/A", "N/A", "N/A"
+
 
 # ✅ Process each row and update Google Sheets with earnings data
 for i, row in enumerate(data[1:], start=2):  # Skip headers
