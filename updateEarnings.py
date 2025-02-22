@@ -56,13 +56,18 @@ updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] f
 # ✅ Update Google Sheets with the existing data structure
 top_picks_ws.clear()
 top_picks_ws.update("A1", updated_data)
+
 def get_earnings_data(ticker, max_retries=3):
     """Fetch earnings data from Yahoo Finance with updated API handling."""
     retries = 0
     while retries < max_retries:
         try:
             stock = yf.Ticker(ticker)
-
+            # ✅ Get all available data as JSON
+            stock_data = stock.info  # Dictionary containing all fundamental details
+    
+            # ✅ Print full JSON response in a readable format
+            print(json.dumps(stock_data, indent=4))  # Pretty print the full response
             # ✅ Fetch earnings date from calendar safely
             earnings_date = "N/A"
             try:
