@@ -57,30 +57,30 @@ updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] f
 top_picks_ws.clear()
 top_picks_ws.update("A1", updated_data)
 def get_earnings_data(ticker, max_retries=3):
-    """Fetch earnings data from Yahoo Finance and handle missing attributes properly."""
+    """Fetch earnings data from Yahoo Finance, ensuring accurate values."""
     retries = 0
     while retries < max_retries:
         try:
             stock = yf.Ticker(ticker)
-            # ✅ Get all available data as JSON
-            stock_data = stock.info  # Dictionary containing all fundamental details
-    
-            # ✅ Print full JSON response in a readable format
-            print(json.dumps(stock_data, indent=4))  # Pretty print the full response
-            # ✅ Extract earnings-related data
-            earnings_date = "N/A"
-            if "earningsTimestampStart" in stock.info and "earningsTimestampEnd" in stock.info:
-                earnings_date = datetime.utcfromtimestamp(stock.info["earningsTimestampStart"]).strftime("%Y-%m-%d")
+            stock_info = stock.info  # Fetch full stock info
 
-            # ✅ Extract financial metrics
-            eps = stock.info.get("trailingEps", "N/A")  # EPS (Earnings Per Share)
-            revenue_growth = stock.info.get("revenueGrowth", "N/A")  # Revenue Growth %
-            debt_to_equity = stock.info.get("debtToEquity", "N/A")  # Debt-to-Equity Ratio
-            
-            # ✅ Extract earnings surprise (Since `earnings` is deprecated, use `netIncomeToCommon`)
-            earnings_surprise = stock.info.get("netIncomeToCommon", "N/A")
+            # ✅ Fetch earnings-related data
+            earnings_date = stock_info.get("earningsTimestampStart", "N/A")
+            eps_actual = stock_info.get("trailingEps", "N/A")  # Reported EPS
+            eps_estimate = stock_info.get("epsForward", "N/A")  # Expected EPS
+            revenue_growth = stock_info.get("revenueGrowth", "N/A")  # Revenue Growth %
+            debt_to_equity = stock_info.get("debtToEquity", "N/A")  # Debt-to-Equity Ratio
 
-            return earnings_date, eps, revenue_growth, debt_to_equity, earnings_surprise
+            # ✅ Calculate Earnings Surprise
+            earnings_surprise = "N/A"
+            if eps_actual != "N/A" and eps_estimate != "N/A" and eps_estimate != 0:
+                earnings_surprise = round(((eps_actual - eps_estimate) / eps_estimate) * 100, 2)
+
+            # ✅ Fallback to Quarterly Earnings Growth if Surprise Calculation Fails
+            if earnings_surprise == "N/A":
+                earnings_surprise = stock_info.get("earningsQuarterlyGrowth", "N/A")
+
+            return earnings_date, eps_actual, revenue_growth, debt_to_equity, earnings_surprise
 
         except Exception as e:
             error_msg = str(e)
@@ -94,6 +94,7 @@ def get_earnings_data(ticker, max_retries=3):
 
     print(f"❌ Skipping {ticker} after {max_retries} failed attempts due to YFinance rate limits.")
     return "N/A", "N/A", "N/A", "N/A", "N/A"
+
 
 
 # ✅ Process each row and update Google Sheets with earnings data
