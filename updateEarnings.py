@@ -1,10 +1,12 @@
-import gspread
+import os  # Required for environment variables
+import json  # Required for JSON parsing
 import yfinance as yf
-import json
-import time
-import openai
+import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, timedelta
+import time
+import pandas as pd
+import numpy as np
+from datetime import datetime  
 import re  # ✅ Ensure `re` is imported for regex parsing
 from gspread_formatting import format_cell_range, CellFormat, Color
 # 🔹 Google Sheets API Setup
