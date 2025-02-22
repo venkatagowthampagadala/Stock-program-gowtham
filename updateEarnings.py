@@ -75,11 +75,11 @@ def get_earnings_data(ticker, max_retries=3):
 
             # ✅ Calculate Earnings Surprise
             earnings_surprise = "N/A"
-            if eps_actual != "N/A" and eps_estimate != "N/A" and eps_estimate != 0:
+             # ✅ Validate EPS Estimate before Calculation
+            if eps_actual != "N/A" and eps_estimate != "N/A" and eps_estimate > 0:
                 earnings_surprise = round(((eps_actual - eps_estimate) / eps_estimate) * 100, 2)
-
-            # ✅ Fallback to Quarterly Earnings Growth if Surprise Calculation Fails
-            if earnings_surprise == "N/A":
+            else:
+                # ⚠️ If `epsForward` is missing, use `earningsQuarterlyGrowth` instead.
                 earnings_surprise = stock_info.get("earningsQuarterlyGrowth", "N/A")
 
             return earnings_date, eps_actual, revenue_growth, debt_to_equity, earnings_surprise
