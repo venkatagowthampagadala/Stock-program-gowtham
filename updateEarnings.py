@@ -57,13 +57,13 @@ updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] f
 top_picks_ws.clear()
 top_picks_ws.update("A1", updated_data)
 def get_earnings_data(ticker, max_retries=3):
-    """Fetch earnings data from Yahoo Finance, avoiding missing attributes."""
+    """Fetch earnings data from Yahoo Finance with updated API handling."""
     retries = 0
     while retries < max_retries:
         try:
             stock = yf.Ticker(ticker)
 
-            # ✅ Fetch earnings calendar data
+            # ✅ Fetch earnings date from calendar safely
             earnings_date = "N/A"
             try:
                 if "Earnings Date" in stock.calendar.index:
@@ -71,16 +71,17 @@ def get_earnings_data(ticker, max_retries=3):
             except Exception:
                 earnings_date = "N/A"
 
-            # ✅ Fetch key financial metrics
-            eps = stock.info.get("trailingEps") or "N/A"  # EPS (Trailing)
-            revenue_growth = stock.info.get("revenueGrowth") or "N/A"  # Revenue Growth
-            debt_to_equity = stock.info.get("debtToEquity") or "N/A"  # Debt-to-Equity Ratio
+            # ✅ Fetch key financial metrics safely
+            eps = stock.info.get("trailingEps", "N/A")
+            revenue_growth = stock.info.get("revenueGrowth", "N/A")
+            debt_to_equity = stock.info.get("debtToEquity", "N/A")
 
-            # ✅ Fetch earnings surprise manually from earnings history
+            # ✅ Fetch earnings surprise from income statement (Alternative to `stock.earnings`)
             earnings_surprise = "N/A"
             try:
-                if not stock.earnings.empty and "Earnings" in stock.earnings.columns:
-                    earnings_surprise = round(stock.earnings["Earnings"].iloc[-1], 2)
+                income_stmt = stock.income_stmt
+                if "Net Income" in income_stmt.index and len(income_stmt.columns) > 0:
+                    earnings_surprise = round(income_stmt.iloc[-1].sum(), 2)  # Fetch most recent net income
             except Exception:
                 earnings_surprise = "N/A"
 
@@ -90,7 +91,7 @@ def get_earnings_data(ticker, max_retries=3):
             error_msg = str(e)
             if "Too Many Requests" in error_msg:
                 print(f"⚠️ YFinance Rate Limit hit for {ticker}. Retrying in 30 seconds...")
-                time.sleep(30)  # ✅ Shorter delay instead of 60s to prevent unnecessary long waits
+                time.sleep(30)  # ✅ Shorter wait to reduce downtime
                 retries += 1
             else:
                 print(f"❌ Error fetching earnings data for {ticker}: {e}")
