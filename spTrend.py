@@ -1,4 +1,5 @@
 import gspread
+import json  # Required for JSON parsing
 import yfinance as yf
 from oauth2client.service_account import ServiceAccountCredentials
 import time
