@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import os
+
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
@@ -26,10 +27,12 @@ active_api = 1  # Track active API key
 
 # ✅ Function to switch API keys when hitting rate limits
 def switch_api_key():
-    global active_api, client
+    global active_api, client, sp_trend_ws, sheet
     active_api = 2 if active_api == 1 else 1  # Toggle API key
     client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to Google Sheets API Key {active_api}")
+    sheet = client.open("Stock Investment Analysis")
+    sp_trend_ws = sheet.worksheet("SP Trend")  # ✅ Ensure `sp_trend_ws` is reassigned globally
 
 # ✅ Open Google Sheet and Select "SP Trend" worksheet
 sheet = client.open("Stock Investment Analysis")
@@ -96,6 +99,7 @@ def calculate_atr(hist, period=14):
 
 # ✅ Update Google Sheet with S&P 500 Trend Data
 def update_sp_trend():
+    global sp_trend_ws, sheet  # ✅ Ensure `sp_trend_ws` remains accessible
     retry_attempts = 0
     while retry_attempts < 5:  # Retry up to 5 times in case of API errors
         try:
@@ -113,8 +117,6 @@ def update_sp_trend():
                 print(f"⚠️ Rate limit hit! Retrying in 60 seconds (Attempt {retry_attempts})...")
                 time.sleep(60)  # Wait before retrying
                 switch_api_key()
-                sheet = client.open("Stock Investment Analysis")
-                sp_trend_ws = sheet.worksheet("SP Trend")
             else:
                 print(f"❌ Error updating SP Trend Sheet: {e}")
                 break  # Exit loop for non-rate limit errors
