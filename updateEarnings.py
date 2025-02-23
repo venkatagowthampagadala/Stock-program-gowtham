@@ -74,17 +74,18 @@ def get_earnings_data(ticker, max_retries=3):
             eps_estimate = stock_info.get("epsForward", "N/A")  # Expected EPS
             revenue_growth = stock_info.get("revenueGrowth", "N/A")  # Revenue Growth %
             debt_to_equity = stock_info.get("debtToEquity", "N/A")  # Debt-to-Equity Ratio
-
+            print(f"eps_actual : {eps_actual},eps_estimate : {eps_estimate} , revenue_growth : {revenue_growth},debt_to_equity : {debt_to_equity} ")
             # ✅ Ensure numerical values are valid
             eps_actual = float(eps_actual) if isinstance(eps_actual, (int, float)) else "N/A"
             eps_estimate = float(eps_estimate) if isinstance(eps_estimate, (int, float)) else "N/A"
             revenue_growth = float(revenue_growth) if isinstance(revenue_growth, (int, float)) else "N/A"
             debt_to_equity = float(debt_to_equity) if isinstance(debt_to_equity, (int, float)) else "N/A"
-
+            print(f"eps_actual : {eps_actual},eps_estimate : {eps_estimate} , revenue_growth : {revenue_growth},debt_to_equity : {debt_to_equity} ")
             # ✅ Calculate Earnings Surprise
             earnings_surprise = "N/A"
             if eps_actual != "N/A" and eps_estimate != "N/A" and eps_estimate > 0:
                 earnings_surprise = round(((eps_actual - eps_estimate) / eps_estimate) * 100, 2)
+                print(f"earnings_surprise : {earnings_surprise}")
             else:
                 # ⚠️ If `epsForward` is missing, use `earningsQuarterlyGrowth` instead.
                 earnings_surprise = stock_info.get("earningsQuarterlyGrowth", "N/A")
