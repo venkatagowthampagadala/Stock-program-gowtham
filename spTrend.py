@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import numpy as np
 from datetime import datetime
-
+import os
 # 🔹 Google Sheets API Setup
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
