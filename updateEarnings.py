@@ -63,7 +63,7 @@ def get_earnings_data(ticker, max_retries=3):
         try:
             stock = yf.Ticker(ticker)
             stock_info = stock.info  # Fetch full stock info
-            print(json.dumps(stock_data, indent=4))  # Pretty print the full response
+            print(json.dumps(stock_info, indent=4))  # Pretty print the full response
             # ✅ Fetch Earnings Date safely
             earnings_date = "N/A"
             if stock_info.get("earningsTimestampStart"):
