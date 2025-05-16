@@ -38,9 +38,8 @@ def switch_api_key():
     global active_api, client
     active_api = 2 if active_api == 1 else 1  # Toggle API key
     client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
-    print(f"🔄 Switched to Google Sheets API Key {active_api}")}")
-
-# 🔹 Function to switch API keys when hitting rate limits
+    print(f"🔄 Switched to API Key {active_api}")
+# 🔹 Function to fetch tickers from a Google Sheet
 def fetch_tickers(worksheet):
     try:
         tickers = worksheet.col_values(1)[1:]  # Reads tickers from Column A, skipping header
