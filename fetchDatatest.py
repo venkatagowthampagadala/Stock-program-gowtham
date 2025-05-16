@@ -38,7 +38,7 @@ sheets_to_update = {
 def switch_api_key():
     global active_api, client
     active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
+    client = authenticate_with_json(CREDS_FILE_2 if active_api == 2 else CREDS_FILE_1)
     print(f"🔄 Switched to API Key {active_api}")
 
 # 🔹 Function to fetch tickers from a Google Sheet
@@ -92,151 +92,149 @@ def calculate_vwma(prices, volumes, period=20):
         return "N/A"
 
 # 🔹 Function to fetch stock data (Handles YFinance Rate Limits)
-def get_stock_data_batch(ticker_list, max_retries=3):
+def get_stock_data(ticker, max_retries=3):
     retries = 0
     while retries < max_retries:
         try:
-            # ✅ Fetch data for multiple tickers at once
-            tickers = yf.Tickers(ticker_list)
-            data = {}
+            print(ticker)
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
+            #print(hist)
 
-            for ticker in ticker_list:
-                stock = tickers.tickers.get(ticker)
-                if stock is None:
-                    print(f"⚠️ No data found for {ticker}")
-                    continue
-                
-                hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
-                if hist.empty:
-                    print(f"⚠️ No historical data for {ticker}")
-                    continue
+            if hist.empty:
+                print(f"⚠️ No historical data for {ticker}")
+                return None
 
-                # Extract Close prices and Volumes
-                prices = hist["Close"]
-                volumes = hist["Volume"]
-    
-                # Market Cap and P/E Ratio
-                market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
-                pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
-    
-                # Current Price (latest available close price)
-                current_price = safe_convert(prices.iloc[-1])
-    
-                # Yesterday's Close Price
-                yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
-                # Check if current_price is zero or N/A and assign yesterday_close_price
-                if current_price == 0 or current_price == "N/A":
-                    current_price = yesterday_close_price
-                    print(f"🔄 Current price for {ticker} set to yesterday's close: {current_price}")
-    
-                # 1-Day Price Change
-                percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
-    
-                # 1-Week and 1-Month Price Changes
-                one_week_ago_price = safe_convert(prices.iloc[-6]) if len(prices) > 6 else "N/A"
-                one_month_ago_price = safe_convert(prices.iloc[0])
-                percent_change_1wk = round(((current_price - one_week_ago_price) / one_week_ago_price) * 100, 2) if one_week_ago_price != "N/A" else "N/A"
-                percent_change_1mo = round(((current_price - one_month_ago_price) / one_month_ago_price) * 100, 2)
-    
-                # Volume
-                volume = safe_convert(volumes.iloc[-1])
-    
-                # RSI (14-day)
-                rsi = calculate_rsi(prices, period=14)
-    
-                # VWMA (20-day)
-                vwma = calculate_vwma(prices, volumes, period=20)
-    
-                # EMA (10-day)
-                ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
-    
-                # ATR (14-day)
-                atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
+            # Extract Close prices and Volumes
+            prices = hist["Close"]
+            volumes = hist["Volume"]
 
-                # Store fetched data
-                data[ticker] = [
+            # Market Cap and P/E Ratio
+            market_cap = safe_convert(stock.info.get("marketCap", "N/A"))
+            pe_ratio = safe_convert(stock.info.get("trailingPE", "N/A"))
+
+            # Current Price (latest available close price)
+            current_price = safe_convert(prices.iloc[-1])
+
+            # Yesterday's Close Price
+            yesterday_close_price = safe_convert(prices.iloc[-2]) if len(prices) > 1 else "N/A"
+            # Check if current_price is zero or N/A and assign yesterday_close_price
+            if current_price == 0 or current_price == "N/A":
+                current_price = yesterday_close_price
+                print(f"🔄 Current price for {ticker} set to yesterday's close: {current_price}")
+
+            # 1-Day Price Change
+            percent_change_1d = round(((current_price - yesterday_close_price) / yesterday_close_price) * 100, 2) if yesterday_close_price != "N/A" else "N/A"
+
+            # 1-Week and 1-Month Price Changes
+            one_week_ago_price = safe_convert(prices.iloc[-6]) if len(prices) > 6 else "N/A"
+            one_month_ago_price = safe_convert(prices.iloc[0])
+            percent_change_1wk = round(((current_price - one_week_ago_price) / one_week_ago_price) * 100, 2) if one_week_ago_price != "N/A" else "N/A"
+            percent_change_1mo = round(((current_price - one_month_ago_price) / one_month_ago_price) * 100, 2)
+
+            # Volume
+            volume = safe_convert(volumes.iloc[-1])
+
+            # RSI (14-day)
+            rsi = calculate_rsi(prices, period=14)
+
+            # VWMA (20-day)
+            vwma = calculate_vwma(prices, volumes, period=20)
+
+            # EMA (10-day)
+            ema = safe_convert(prices.ewm(span=10, adjust=False).mean().iloc[-1])
+
+            # ATR (14-day)
+            atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
+            # --- NEW momentum‑centric metrics ---
+            # Relative Volume (today vs 20‑day avg excluding today)
+            rvol = "N/A"
+            if len(volumes) > 21:
+                avg20 = volumes.iloc[-21:-1].mean()
+                rvol = safe_convert(round(volume/avg20, 2)) if avg20 else "N/A"
+
+            dollar_vol = safe_convert(round(current_price * volume, 0)) if current_price!="N/A" else "N/A"
+
+            float_shares        = safe_convert(stock.info.get("floatShares", "N/A"))
+            short_percent_float = safe_convert(stock.info.get("shortPercentOfFloat", stock.info.get("shortPercentFloat", "N/A")))
+            days_to_cover       = safe_convert(stock.info.get("shortRatio", "N/A"))
+
+            # Gap % (today open vs yesterday close)
+            gap_pct = "N/A"
+            if len(hist)>1:
+                open_today = hist["Open"].iloc[-1]
+                gap_pct = format_percentage(((open_today - yesterday_close_price)/yesterday_close_price)*100) if yesterday_close_price!="N/A" else "N/A"
+
+            dist_to_vwap = safe_convert(round(current_price - vwma, 2)) if current_price!="N/A" and vwma!="N/A" else "N/A"
+            print(market_cap, pe_ratio, current_price, yesterday_close_price,
+                format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
+                volume, rsi, vwma, ema, atr,rvol, dollar_vol, float_shares, short_percent_float, days_to_cover,
+                gap_pct, dist_to_vwap)
+
+            return [
                 market_cap, pe_ratio, current_price, yesterday_close_price,
                 format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
-                volume, rsi, vwma, ema, atr
-                ]
-
-            return data
+                volume, rsi, vwma, ema, atr,rvol, dollar_vol, float_shares, short_percent_float, days_to_cover,
+                gap_pct, dist_to_vwap
+            ]
 
         except Exception as e:
             error_msg = str(e)
             if "Too Many Requests" in error_msg:
-                print(f"⚠️ YFinance Rate Limit hit. Pausing for 60 seconds...")
-                time.sleep(60)  # ✅ Pause for 60 seconds before retrying
+                print(f"⚠️ YFinance Rate Limit hit for {ticker}. Pausing for 60 seconds...")
+                time.sleep(20)  # ✅ Pause for 60 seconds before retrying
                 retries += 1
             else:
-                print(f"❌ Error fetching batch data: {e}")
-                return {}
+                print(f"❌ Error fetching data for {ticker}: {e}")
+                return None
 
-    print(f"❌ Skipping batch after {max_retries} failed attempts due to YFinance rate limits.")
-    return {}
+    print(f"❌ Skipping {ticker} after {max_retries} failed attempts due to YFinance rate limits.")
+    return None  # Skip stock if all retries fail
 
 # 🔹 Process each ticker row-by-row
-
 api_call_count = 0  # Track number of API calls
+
 for sheet_name, worksheet in sheets_to_update.items():
     tickers = fetch_tickers(worksheet)
-    # ✅ Process tickers in smaller batches to avoid YFinance rate limits
-    batch_size = 5  # Reduce batch size to avoid limits
-    for i in range(0, len(tickers), batch_size):
-        batch = tickers[i:i + batch_size]
-    
-        retry_attempts = 0
-        while retry_attempts < 3:  # Retry up to 3 times if rate limit is hit
+
+    for idx, ticker in enumerate(tickers, start=2):  # Start from row 2
+        while True:
             try:
-                stock_data_batch = get_stock_data_batch(batch)
-                break  # ✅ Exit retry loop if successful
-            except Exception as e:
-                if "Too Many Requests" in str(e):
-                    retry_attempts += 1
-                    print(f"⚠️ YFinance Rate Limit hit! Retrying in 60 seconds... (Attempt {retry_attempts})")
-                    time.sleep(60)  # ✅ Wait before retrying
-                else:
-                    print(f"❌ Error fetching data: {e}")
-                    break  # Exit loop for non-rate-limit errors
-    
-        # ✅ Prepare batch update values
-        updates = []
-        timestamp_updates = []
-        
-        for j, ticker in enumerate(batch, start=i + 2):  # Start from row 2
-            if ticker in stock_data_batch:
-                stock_data = stock_data_batch[ticker]
+                stock_data = get_stock_data(ticker)
+                if stock_data is None:
+                    print(f"⚠️ Skipping update for {ticker}: No data available.")
+                    break  
                 fetch_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-                # ✅ Append values for batch update
-                updates.append({"range": f"C{j}:N{j}", "values": [stock_data]})  # Stock data (12 columns)
-                timestamp_updates.append({"range": f"AF{j}", "values": [[fetch_datetime]]})  # Fetch time
-    
-        # ✅ Retry batch updates 5 times before skipping
-        retry_attempts = 0
-        while retry_attempts < 5:
-            try:
-                if updates:
-                    worksheet.batch_update(updates)
-                    worksheet.batch_update(timestamp_updates)
-                    print(f"✅ Updated {sheet_name} for batch {i + 1}-{i + batch_size}")
-                break  # ✅ Exit retry loop if successful
+                # Convert to valid types for Google Sheets
+                stock_data = [safe_convert(val) for val in stock_data]
+
+                # ✅ Prepare batch update payload
+                updates = [
+                    {"range": f"H{idx}:Z{idx}", "values": [stock_data]},  # Stock data (C:N)
+                    {"range": f"AT{idx}", "values": [[fetch_datetime]]}    # Fetch timestamp in AF
+                ]
+
+                # ✅ Perform batch update
+                worksheet.batch_update(updates)
+                print(f"✅ Updated {sheet_name} - {ticker} in row {idx}")
+
+                # ✅ Increment API call count
+                api_call_count += 1
+
+                # ✅ Switch API keys every 20 calls
+                if api_call_count % 15 == 0:
+                    print(f"🔄 Switching API key after 20 calls...  {api_call_count}")
+                    switch_api_key()
+
+                break  
+
             except gspread.exceptions.APIError as e:
                 if "429" in str(e):
-                    retry_attempts += 1
-                    print(f"⚠️ Rate limit hit! Retrying in 10 seconds (Attempt {retry_attempts})...")
-                    time.sleep(10)  # ✅ Wait before retrying
+                    print(f"⚠️ Rate limit hit! Pausing for 60 seconds...")
+                    time.sleep(10)  
                     switch_api_key()
                     worksheet = client.open("Stock Investment Analysis").worksheet(sheet_name)
                 else:
-                    print(f"❌ Error updating {sheet_name}: {e}")
-                    break  # Exit loop for non-429 errors
-    
-        # ✅ Add a delay between batch processing
-        time.sleep(1)  # ✅ Wait 2 seconds before next batch
-        # ✅ Switch API keys every 20 calls
-        if api_call_count % 20 == 0:
-            print(f"🔄 Switching API key after 20 calls... {api_call_count}")
-            switch_api_key()
-
-print("✅ Google Sheets 'Large Cap', 'Mid Cap', 'Technology' & 'SP Tracker' updated!")
+                    print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
+                    break  
+print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated!")
