@@ -124,7 +124,6 @@ def get_earnings_data(ticker, max_retries=3):
 
 
 # ✅ Process each row and update Google Sheets with earnings data
-Reprocess after header update
     for i, row in enumerate(data[1:], start=2):
         row_dict = {headers[j]: row[j] if j < len(row) else "N/A" for j in range(len(headers))}
         ticker = row_dict.get('Symbol', 'N/A')
