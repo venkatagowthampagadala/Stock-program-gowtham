@@ -34,6 +34,7 @@ def switch_api_key():
     print(f"🔄 Switched to Google Sheets API Key {active_api}")
 
 # ✅ Open the spreadsheet and access the "Top Picks" sheet
+sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
