@@ -35,6 +35,7 @@ def switch_api_key():
 
 # ✅ Open the spreadsheet and access the "Top Picks" sheet
 sheet = client.open("Stock Investment Analysis")
+
 sheets_to_update = {
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
@@ -49,7 +50,8 @@ def get_earnings_data(ticker, max_retries=3):
         try:
             stock = yf.Ticker(ticker)
             stock_info = stock.info
-            print(json.dumps(stock_info, indent=4))
+           # print('Checking Stock')
+            #print(json.dumps(stock_info, indent=4))
 
             if "earningsTimestamp" in stock_info:
                 earnings_date = datetime.utcfromtimestamp(stock_info["earningsTimestamp"]).strftime("%Y-%m-%d")
@@ -96,17 +98,17 @@ for sheet_name, ws in sheets_to_update.items():
 
     headers = data[0]
 
-    # ✅ Redefine new headers with earnings columns
-    new_headers = ["Rank", "Symbol", "Earnings Date", "EPS", "Revenue Growth", "Debt-to-Equity", "Earnings Surprise"] + headers[2:]
-    updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] for row in data[1:]]
+## ✅ Redefine new headers with earnings columns
+    #new_headers = ["Rank", "Symbol", "Earnings Date", "EPS", "Revenue Growth", "Debt-to-Equity", "Earnings Surprise"] + headers[2:]
+   # updated_data = [new_headers] + [[row[0], row[1], "", "", "", "", ""] + row[2:] for row in data[1:]]
 
     # ✅ Clear and update sheet
-    ws.clear()
-    ws.update("A1", updated_data)
+   # ws.clear()
+    #ws.update("A1", updated_data)
 
     # ✅ Re-fetch after sheet is wiped
-    data = ws.get_all_values()
-    headers = data[0]
+   # data = ws.get_all_values()
+   # headers = data[0]
 
     for i, row in enumerate(data[1:], start=2):
         row_dict = {headers[j]: row[j] if j < len(row) else "N/A" for j in range(len(headers))}
