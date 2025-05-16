@@ -35,16 +35,29 @@ def switch_api_key():
 
 # ✅ Open the spreadsheet and access the "Top Picks" sheet
 sheet = client.open("Stock Investment Analysis")
-top_picks_ws = sheet.worksheet("Top Picks")
+sheets_to_update = {
+    "Large Cap" : sheet.worksheet("Large Cap"),
+    "Mid Cap"   : sheet.worksheet("Mid Cap"),
+    "Technology": sheet.worksheet("Technology"),
+    "SP Tracker": sheet.worksheet("SP Tracker"),
+    "Top Picks" : sheet.worksheet("Top Picks"),
+}
 
-# ✅ Fetch all data from "Top Picks"
-data = top_picks_ws.get_all_values()
-headers = data[0]  # Extract column headers
+for sheet_name, ws in sheets_to_update.items():
+    print(f"\n🔁 Processing Sheet: {sheet_name}")
+    data = ws.get_all_values()
+    if not data or len(data) < 2:
+        print(f"⚠️ Sheet {sheet_name} has no data.")
+        continue
+
+    headers = data[0]
+    existing_data = data
+
 
 # ✅ Define function to fetch existing data
-def fetch_existing_data():
-    return top_picks_ws.get_all_values()
-
+def fetch_existing_data(ws):
+    return ws.get_all_values()
+    
 existing_data = fetch_existing_data()
 
 # ✅ Define new headers including earnings data
@@ -111,39 +124,43 @@ def get_earnings_data(ticker, max_retries=3):
 
 
 # ✅ Process each row and update Google Sheets with earnings data
-for i, row in enumerate(data[1:], start=2):  # Skip headers
-    row_dict = {headers[j]: row[j] if j < len(row) else "N/A" for j in range(len(headers))}
-    ticker = row_dict.get('Symbol', 'N/A')
+Reprocess after header update
+    for i, row in enumerate(data[1:], start=2):
+        row_dict = {headers[j]: row[j] if j < len(row) else "N/A" for j in range(len(headers))}
+        ticker = row_dict.get('Symbol', 'N/A')
 
-    # ✅ Fetch Earnings Data
-    earnings_date, eps, revenue_growth, debt_to_equity, earnings_surprise = get_earnings_data(ticker)
+        if not ticker or ticker == "N/A":
+            continue
 
-    # ✅ Prepare updates batch
-    updates = [
-        {"range": f"C{i}", "values": [[earnings_date]]},  # Earnings Date
-        {"range": f"D{i}", "values": [[eps]]},  # EPS
-        {"range": f"E{i}", "values": [[revenue_growth]]},  # Revenue Growth
-        {"range": f"F{i}", "values": [[debt_to_equity]]},  # Debt-to-Equity Ratio
-        {"range": f"G{i}", "values": [[earnings_surprise]]}  # Earnings Surprise
-    ]
+        earnings_date, eps, revenue_growth, debt_to_equity, earnings_surprise = get_earnings_data(ticker)
 
-    retry_attempts = 0
-    while retry_attempts < 5:
-        try:
-            top_picks_ws.batch_update(updates)
-            print(f"✅ Updated Earnings Data for {ticker} in row {i}")
-            time.sleep(1)  # Prevent hitting rate limits
-            break  # ✅ Exit retry loop if successful
-        except gspread.exceptions.APIError as e:
-            if "429" in str(e):
-                retry_attempts += 1
-                print(f"⚠️ Rate limit hit! Retrying in 10 seconds (Attempt {retry_attempts})...")
-                time.sleep(10)  # ✅ Wait for 10 seconds before retrying
-                switch_api_key()  # ✅ Switch API key if needed
-                sheet = client.open("Stock Investment Analysis")  # Reconnect
-                top_picks_ws = sheet.worksheet("Top Picks")  # Rebind worksheet
-            else:
-                print(f"❌ Error updating Google Sheets for {ticker}: {e}")
-                break  # Exit loop for non-429 errors
+        # ✅ Prepare updates batch
+        updates = [
+            {"range": f"C{i}", "values": [[earnings_date]]},        # Earnings Date
+            {"range": f"D{i}", "values": [[eps]]},                 # EPS
+            {"range": f"E{i}", "values": [[revenue_growth]]},     # Revenue Growth
+            {"range": f"F{i}", "values": [[debt_to_equity]]},     # Debt-to-Equity
+            {"range": f"G{i}", "values": [[earnings_surprise]]}   # Earnings Surprise
+        ]
 
-print("✅ Earnings Data Successfully Updated in 'Top Picks' Sheet!")
+        retry_attempts = 0
+        while retry_attempts < 5:
+            try:
+                ws.batch_update(updates)
+                print(f"✅ Updated Earnings Data for {ticker} in {sheet_name} row {i}")
+                time.sleep(1)
+                break
+            except gspread.exceptions.APIError as e:
+                if "429" in str(e):
+                    retry_attempts += 1
+                    print(f"⚠️ Rate limit! Retrying in 10 sec (Attempt {retry_attempts})...")
+                    time.sleep(10)
+                    switch_api_key()
+                    sheet = client.open("Stock Investment Analysis")
+                    ws = sheet.worksheet(sheet_name)
+                else:
+                    print(f"❌ Error updating Google Sheets for {ticker} in {sheet_name}: {e}")
+                    break
+
+print("\n✅ Earnings Data Successfully Updated in All Sheets!")
+
