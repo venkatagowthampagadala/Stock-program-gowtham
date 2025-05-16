@@ -39,6 +39,7 @@ def switch_api_key():
     active_api = 2 if active_api == 1 else 1  # Toggle API key
     client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
     print(f"🔄 Switched to API Key {active_api}")
+
 # 🔹 Function to fetch tickers from a Google Sheet
 def fetch_tickers(worksheet):
     try:
@@ -193,7 +194,6 @@ def get_stock_data(ticker, max_retries=3):
 
     print(f"❌ Skipping {ticker} after {max_retries} failed attempts due to YFinance rate limits.")
     return None  # Skip stock if all retries fail
-
 # 🔹 Process each ticker row-by-row
 api_call_count = 0  # Track number of API calls
 
@@ -240,4 +240,5 @@ for sheet_name, worksheet in sheets_to_update.items():
                 else:
                     print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
                     break  
+
 print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated!")
