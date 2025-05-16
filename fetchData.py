@@ -37,10 +37,10 @@ sheets_to_update = {
 def switch_api_key():
     global active_api, client
     active_api = 2 if active_api == 1 else 1  # Toggle API key
-    client = authenticate_with_json(CREDS_JSON_2 if active_api == 2 else CREDS_JSON_1)
+    client = authenticate_with_json(CREDS_FILE_2 if active_api == 2 else CREDS_FILE_1)
     print(f"🔄 Switched to API Key {active_api}")
 
-# 🔹 Function to fetch tickers from a Google Sheet
+# 🔹 Function to switch API keys when hitting rate limits
 def fetch_tickers(worksheet):
     try:
         tickers = worksheet.col_values(1)[1:]  # Reads tickers from Column A, skipping header
@@ -95,8 +95,10 @@ def get_stock_data(ticker, max_retries=3):
     retries = 0
     while retries < max_retries:
         try:
+            print(ticker)
             stock = yf.Ticker(ticker)
             hist = stock.history(period="3mo")  # ✅ Fetch 3 months of data
+            #print(hist)
 
             if hist.empty:
                 print(f"⚠️ No historical data for {ticker}")
@@ -143,11 +145,41 @@ def get_stock_data(ticker, max_retries=3):
 
             # ATR (14-day)
             atr = safe_convert((hist["High"] - hist["Low"]).rolling(14).mean().iloc[-1])
+# NEW ► Relative ATR  (risk normalised)
+            rel_atr = "N/A"
+            if current_price not in ("N/A", 0):
+                rel_atr = safe_convert(round(atr / current_price, 4))            
+            # --- NEW momentum‑centric metrics ---
+            # Relative Volume (today vs 20‑day avg excluding today)
+            rvol = "N/A"
+            if len(volumes) > 21:
+                avg20 = volumes.iloc[-21:-1].mean()
+                rvol = safe_convert(round(volume/avg20, 2)) if avg20 else "N/A"
+
+            dollar_vol = safe_convert(round(current_price * volume, 0)) if current_price!="N/A" else "N/A"
+
+            float_shares        = safe_convert(stock.info.get("floatShares", "N/A"))
+            short_percent_float = safe_convert(stock.info.get("shortPercentOfFloat", stock.info.get("shortPercentFloat", "N/A")))
+            days_to_cover       = safe_convert(stock.info.get("shortRatio", "N/A"))
+
+            # Gap % (today open vs yesterday close)
+            gap_pct = "N/A"
+            if len(hist)>1:
+                open_today = hist["Open"].iloc[-1]
+                gap_pct = format_percentage(((open_today - yesterday_close_price)/yesterday_close_price)*100) if yesterday_close_price!="N/A" else "N/A"
+
+            dist_to_vwap = safe_convert(round(current_price - vwma, 2)) if current_price!="N/A" and vwma!="N/A" else "N/A"
+            
+            print(market_cap, pe_ratio, current_price, yesterday_close_price,
+                format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
+                volume, rsi, vwma, ema, atr,rvol, dollar_vol, float_shares, short_percent_float, days_to_cover,
+                gap_pct, dist_to_vwap,rel_atr)
 
             return [
                 market_cap, pe_ratio, current_price, yesterday_close_price,
                 format_percentage(percent_change_1d), format_percentage(percent_change_1wk), format_percentage(percent_change_1mo),
-                volume, rsi, vwma, ema, atr
+                volume, rsi, vwma, ema, atr,rvol, dollar_vol, float_shares, short_percent_float, days_to_cover,
+                gap_pct, dist_to_vwap,rel_atr
             ]
 
         except Exception as e:
@@ -182,8 +214,8 @@ for sheet_name, worksheet in sheets_to_update.items():
 
                 # ✅ Prepare batch update payload
                 updates = [
-                    {"range": f"C{idx}:N{idx}", "values": [stock_data]},  # Stock data (C:N)
-                    {"range": f"AF{idx}", "values": [[fetch_datetime]]}    # Fetch timestamp in AF
+                    {"range": f"I{idx}:AB{idx}", "values": [stock_data]},  # Stock data (C:N)
+                    {"range": f"AV{idx}", "values": [[fetch_datetime]]}    # Fetch timestamp in AF
                 ]
 
                 # ✅ Perform batch update
@@ -209,5 +241,4 @@ for sheet_name, worksheet in sheets_to_update.items():
                 else:
                     print(f"❌ Error updating {sheet_name} - {ticker}: {e}")
                     break  
-
 print("✅ Google Sheets 'Large Cap' & 'Mid Cap' updated!")
