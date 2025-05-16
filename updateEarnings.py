@@ -34,8 +34,8 @@ def switch_api_key():
     print(f"🔄 Switched to Google Sheets API Key {active_api}")
 
 # ✅ Open the spreadsheet and access the "Top Picks" sheet
-sheet = client.open("Stock Investment Analysis")
 
+sheet = client.open("Stock Investment Analysis")
 sheets_to_update = {
     "Large Cap": sheet.worksheet("Large Cap"),
     "Mid Cap": sheet.worksheet("Mid Cap"),
@@ -73,9 +73,17 @@ def get_earnings_data(ticker, max_retries=3):
                 earnings_surprise = round(((eps_actual - eps_estimate) / eps_estimate) * 100, 2)
             else:
                 earnings_surprise = stock_info.get("earningsQuarterlyGrowth", "N/A")
-
-            print(f"📊 {ticker} Earnings Data: EPS={eps_actual}, Growth={revenue_growth}, Debt={debt_to_equity}, Surprise={earnings_surprise}")
-            return earnings_date, eps_actual, revenue_growth, debt_to_equity, earnings_surprise
+            try:
+                dte_val = (
+                    datetime.strptime(earnings_date, "%Y-%m-%d").date()
+                    - datetime.today().date()
+                ).days
+            except (TypeError, ValueError):
+                dte_val = 999        # default when earnings date is “N/A”
+     
+            
+            print(f"📊 {ticker} Earnings Data: EPS={eps_actual}, Growth={revenue_growth}, Debt={debt_to_equity}, Surprise={earnings_surprise},DTE={dte_val}")
+            return earnings_date, eps_actual, revenue_growth, debt_to_equity, earnings_surprise,dte_val
 
         except Exception as e:
             if "Too Many Requests" in str(e):
@@ -117,14 +125,15 @@ for sheet_name, ws in sheets_to_update.items():
         if not ticker or ticker == "N/A":
             continue
 
-        earnings_date, eps, revenue_growth, debt_to_equity, earnings_surprise = get_earnings_data(ticker)
+        earnings_date, eps, revenue_growth, debt_to_equity, earnings_surprise,dte_val = get_earnings_data(ticker)
 
         updates = [
             {"range": f"C{i}", "values": [[earnings_date]]},
             {"range": f"D{i}", "values": [[eps]]},
             {"range": f"E{i}", "values": [[revenue_growth]]},
             {"range": f"F{i}", "values": [[debt_to_equity]]},
-            {"range": f"G{i}", "values": [[earnings_surprise]]}
+            {"range": f"G{i}", "values": [[earnings_surprise]]},
+            {"range": f"H{i}", "values": [[dte_val]]},  
         ]
 
         retry_attempts = 0
