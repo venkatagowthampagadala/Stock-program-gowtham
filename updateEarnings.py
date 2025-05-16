@@ -92,10 +92,10 @@ def get_earnings_data(ticker, max_retries=3):
                 retries += 1
             else:
                 print(f"❌ Error fetching earnings data for {ticker}: {e}")
-                return "N/A", "N/A", "N/A", "N/A", "N/A"
+                return "N/A", "N/A", "N/A", "N/A", "N/A",999
 
     print(f"❌ Skipping {ticker} after retries.")
-    return "N/A", "N/A", "N/A", "N/A", "N/A"
+    return "N/A", "N/A", "N/A", "N/A", "N/A",999
 
 for sheet_name, ws in sheets_to_update.items():
     print(f"\n🔁 Processing Sheet: {sheet_name}")
