@@ -214,7 +214,7 @@ for sheet_name, worksheet in sheets_to_update.items():
                 # ✅ Prepare batch update payload
                 updates = [
                     {"range": f"I{idx}:AB{idx}", "values": [stock_data]},  # Stock data (C:N)
-                    {"range": f"AV{idx}", "values": [[fetch_datetime]]}    # Fetch timestamp in AF
+                    {"range": f"AT{idx}", "values": [[fetch_datetime]]}    # Fetch timestamp in AF
                 ]
 
                 # ✅ Perform batch update
