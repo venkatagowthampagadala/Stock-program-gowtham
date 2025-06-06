@@ -72,8 +72,10 @@ def fetch_sp_trend():
         rsi = calculate_rsi(hist["Close"], period=14)
         atr = calculate_atr(hist)
         vix_value = round(vix_data["Close"].iloc[-1], 2) if not vix_data.empty else "N/A"
-
-        return ["SPY", round(current_price, 2), one_month_change, three_month_change, rsi, atr, vix_value]
+        ema20      = round(hist["Close"].ewm(span=20, adjust=False).mean().iloc[-1], 2)
+       
+        risk_on = "TRUE" if (current_price > ema20 and vix_value < 20) else "FALSE"
+        return ["SPY", round(current_price, 2), one_month_change, three_month_change, rsi, atr,ema20, vix_value, risk_on]
 
     except Exception as e:
         print(f"❌ Error fetching S&P 500 trend data: {e}")
@@ -105,7 +107,7 @@ def update_sp_trend():
         try:
             market_data = fetch_sp_trend()
             if market_data:
-                sp_trend_ws.update("A2:G2", [market_data])
+                sp_trend_ws.update("A2:I2", [market_data])
                 print(f"✅ Updated SP Trend: {market_data}")
             else:
                 print("⚠️ Failed to fetch S&P 500 market trend data.")
